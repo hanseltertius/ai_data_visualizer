@@ -63,14 +63,9 @@ def display_tabs(df):
             reformatted_user_input = user_input.strip()
             if reformatted_user_input:
                 with st.spinner("Generating insight..."):
-                    # TODO : getting the dataframe
-                    generated = generate_insight_from_openai(reformatted_user_input, df)
-                    st.write(generated)
-                # TODO : kita bakal generating dl (smua layout di disable (maybe))
-
-                # TODO : response need to generate text to speech (use hugging face models)
+                    generate_insight_from_openai(reformatted_user_input, df)
             else:
-                st.warning("Insight input cannot be empty.")
+                st.error("Insight input cannot be empty.")
     with tab_chart:
         # TODO : tinggal generate the chart based on select box
         # TODO : setelah pake generate the chart based on select box, tinggal pake button, trus generate popup ny
@@ -89,17 +84,25 @@ def generate_insight_from_openai(user_input, df):
     Can you generate the the insight based on "User Question".
     """
 
-    response = openai.chat.completions.create(
+    response_placeholder = st.empty()
+    full_response = ""
+
+    stream = openai.chat.completions.create(
         model="gpt-4o",
         messages=[
             {"role": "user", "content": prompt}
-        ]
+        ],
+        stream=True
     )
 
-    # TODO : it potentially get out of index, need to handle the feature
-    result = response.choices[0].message.content.strip()
-
-    return result
+    # TODO : handle status != 200
+    for chunk in stream:
+        if chunk.choices and hasattr(chunk.choices[0], "delta"):
+            delta = chunk.choices[0].delta
+            if hasattr(delta, "content") and delta.content:
+                full_response += delta.content
+                response_placeholder.markdown(f"{full_response}▌")
+    response_placeholder.markdown(full_response)
 # endregion
 
 # region UI
