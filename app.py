@@ -13,6 +13,9 @@ ALLOWED_FILE_TYPES = ["csv", "xlsx", "xls", "xlsm"]
 # region State Initialization
 if "uploaded_file" not in st.session_state:
     st.session_state.uploaded_file = None
+
+if "generated_insight" not in st.session_state:
+    st.session_state.generated_insight = None
 # endregion
 
 # region Functions
@@ -54,18 +57,32 @@ def display_tabs(df):
         # st.write(df.info())
         st.write("Summary")
 
-        # TODO : maybe we can summarize from 2 columns and some stuff, maybe can select multiple columns to generate summary, ini mesti dapat info2 dari dataframe bgmn
+        # TODO : maybe we can summarize from 2 columns and some stuff, maybe can select multiple columns to generate summary, ini mesti dapat info2 dari dataframe bgmn, we can select all of the columns, depending on the selection
 
     with tab_insight:
-        user_input = st.text_area("Insight", key="insight_input", placeholder="Write your insight here... (Leading / Trailing whitespaces will be trimmed at the input generation)")
+        user_input = st.text_area(
+            label="",
+            key="insight_input", 
+            placeholder="Write your insight here... (Leading / Trailing whitespaces will be trimmed at the input generation)", 
+            label_visibility="hidden"
+        )
 
         if st.button("Generate Insight", use_container_width=True):
             reformatted_user_input = user_input.strip()
             if reformatted_user_input:
-                with st.spinner("Generating insight..."):
-                    generate_insight_from_openai(reformatted_user_input, df)
+                generate_insight_from_openai(reformatted_user_input, df)
             else:
                 st.error("Insight input cannot be empty.")
+
+        if st.session_state.get("generated_insight"):
+            st.markdown(st.session_state.generated_insight)
+            st.download_button(
+                label="Download Insight",
+                data=st.session_state.generated_insight,
+                file_name="generated_insight.txt",
+                mime="text/plain",
+                use_container_width=True
+            )
     with tab_chart:
         # TODO : tinggal generate the chart based on select box
         # TODO : setelah pake generate the chart based on select box, tinggal pake button, trus generate popup ny
@@ -84,25 +101,32 @@ def generate_insight_from_openai(user_input, df):
     Can you generate the the insight based on "User Question".
     """
 
-    response_placeholder = st.empty()
-    full_response = ""
+    with st.spinner("Generating insight..."):
+        response_placeholder = st.empty()
+        full_response = ""
+        try:
+            stream = openai.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "user", "content": prompt}
+                ],
+                stream=True
+            )
 
-    stream = openai.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "user", "content": prompt}
-        ],
-        stream=True
-    )
-
-    # TODO : handle status != 200
-    for chunk in stream:
-        if chunk.choices and hasattr(chunk.choices[0], "delta"):
-            delta = chunk.choices[0].delta
-            if hasattr(delta, "content") and delta.content:
-                full_response += delta.content
-                response_placeholder.markdown(f"{full_response}▌")
-    response_placeholder.markdown(full_response)
+            for chunk in stream:
+                if chunk.choices and hasattr(chunk.choices[0], "delta"):
+                    delta = chunk.choices[0].delta
+                    if hasattr(delta, "content") and delta.content:
+                        full_response += delta.content
+                        response_placeholder.markdown(f"{full_response}▌")
+            response_placeholder.empty()
+            st.session_state.generated_insight = full_response
+        except Exception as e:
+            st.error(f"""
+            Failed to generate insight: 
+            {e}         
+            """)
+        
 # endregion
 
 # region UI
