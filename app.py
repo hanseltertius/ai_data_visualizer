@@ -1,6 +1,9 @@
 import pandas as pd
 import streamlit as st
+import matplotlib.pyplot as plt
 import openai
+import io
+import base64
 
 # region Initialize API key
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
@@ -33,20 +36,63 @@ def is_valid_uploaded_file(uploaded_file):
 def reset_uploaded_file():
     st.session_state.uploaded_file = None
 
-# TODO : create reusable function to display data frame
-def display_dataframe(uploaded_file = None, selected_sheet_name = "", is_excel=True):
+@st.dialog("Bar Graph Result", width="large")
+def show_bar_graph(df, x_axis, y_axis, selected_file_name, selected_sheet_name = ""):
+    # region Setup Bar Graph
+    chart_title = f"Summary of {selected_file_name} in {selected_sheet_name}" if selected_sheet_name else f"Summary of {selected_file_name}"
+    num_x = len(df[x_axis].unique())
+    fig_width = min(max(8, num_x * 0.5), 40) # Dynamically set width: 0.5 inch per x label, min 8, max 40
+    figure, axes = plt.subplots(figsize=(fig_width, 6))
+    axes.bar(df[x_axis].astype(str), df[y_axis])
+    axes.set_xlabel(x_axis)
+    axes.set_ylabel(y_axis)
+    axes.set_title(chart_title)
+    plt.xticks(rotation=45, ha="right")
+    plt.tight_layout()
+    # endregion
+
+    # region Generate Image
+    buf = io.BytesIO()
+    figure.savefig(buf, format="png", bbox_inches="tight")
+    buf.seek(0)
+    
+
+    # Display image in a horizontally scrollable div
+    img_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+    st.markdown(
+        f"""
+        <div style="overflow-x: auto; width: 100%; padding-bottom: 12px;">
+            <img 
+                style="display: block; min-width: 800px; width: auto; max-width: 100%;" 
+                src="data:image/png;base64,{img_base64}" />
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    # endregion
+
+    # region Download Button
+    st.download_button(
+        "Download as PNG",
+        data=buf,
+        file_name="bar_chart.png",
+        mime="image/png",
+        use_container_width=True
+    )
+    # endregion
+
+def display_dataframe(uploaded_file = None, selected_sheet_name = "", selected_file_name = "", is_excel=True):
     if is_excel:
         st.markdown(f"Displayed data from sheet: ```{selected_sheet_name}```")
         df = pd.read_excel(excel_file, sheet_name=selected_sheet_name)
         st.dataframe(df)
-        display_tabs(df)
+        display_tabs(df, selected_sheet_name=selected_sheet_name, selected_file_name=selected_file_name)
     else:
         df = pd.read_csv(uploaded_file)
         st.dataframe(df)
-        display_tabs(df)
+        display_tabs(df, selected_sheet_name=selected_sheet_name, selected_file_name=selected_file_name)
 
-# TODO : create reusable function to display tabs
-def display_tabs(df):
+def display_tabs(df, selected_sheet_name = "", selected_file_name = ""):
     tab_summary, tab_insight, tab_chart = st.tabs(["Summary", "Insight", "Chart"])
 
     with tab_summary:
@@ -60,8 +106,9 @@ def display_tabs(df):
         # TODO : maybe we can summarize from 2 columns and some stuff, maybe can select multiple columns to generate summary, ini mesti dapat info2 dari dataframe bgmn, we can select all of the columns, depending on the selection
 
     with tab_insight:
+        # TODO : create method for display insight in full, to make the code more clean and neat
         user_input = st.text_area(
-            label="",
+            label="Insight",
             key="insight_input", 
             placeholder="Write your insight here... (Leading / Trailing whitespaces will be trimmed at the input generation)", 
             label_visibility="hidden"
@@ -87,7 +134,59 @@ def display_tabs(df):
         # TODO : tinggal generate the chart based on select box
         # TODO : setelah pake generate the chart based on select box, tinggal pake button, trus generate popup ny
         # TODO : generate summary
-        st.write("Chart")
+        displayed_data_choices = ["Bar Chart", "Pie Chart", "Scatter Plot"]
+
+        selected_display_data = st.selectbox(
+            "Display in", 
+            displayed_data_choices, 
+            index=None, 
+            placeholder="Select data type to display", 
+            key="displayed_data_selector"
+        )
+
+        # TODO : if change selection => display the option first, then press display
+        if selected_display_data is not None:
+            if selected_display_data == "Bar Chart":
+                # TODO : ini mungkin juga perlu handle data type yang aneh2 atau column yang kosong, sbnrnya kan ada condition seperti itu
+                numeric_cols = df.select_dtypes(include="number").columns
+                categorical_cols = df.select_dtypes(exclude="number").columns
+                if len(numeric_cols) == 0:
+                    st.warning("No numerical columns available, please re-upload the data with numeric columns")
+                elif len(categorical_cols) == 0:
+                    st.warning("No categorical columns available, please re-upload the data with categorical columns")
+                else:
+                    x_axis = st.selectbox(
+                        "X-axis", 
+                        categorical_cols,
+                        index=None,
+                        placeholder= "Select x-axis (categorical columns)",
+                        key="bar_x_axis"
+                    )
+                    y_axis = st.selectbox(
+                        "Y-axis", 
+                        numeric_cols,
+                        index=None,
+                        placeholder="Select y-axis (numeric columns)",  
+                        key="bar_y_axis"
+                    )
+
+                    if st.button("Display", key="display_bar_chart"):
+                        if x_axis is None:
+                            st.error("X-axis must not be empty.")
+                        elif y_axis is None:
+                            st.error("Y-axis must not be empty.")
+                        else:
+                            show_bar_graph(df, x_axis, y_axis, selected_file_name, selected_sheet_name)
+
+
+            elif selected_display_data == "Pie Chart":
+                st.write("Pie Chart")
+                # TODO : categorize as bla bla bla
+            elif selected_display_data == "Scatter Plot":
+                st.write("Scatter Plot")
+                # TODO : select axis
+            # TODO : display button after select everything
+
     # TODO : display tabs (summary, insight and charts)
 
 def generate_insight_from_openai(user_input, df):
@@ -148,6 +247,7 @@ if st.button("Upload File", use_container_width=True):
 if st.session_state.uploaded_file is not None:
     uploaded_file = st.session_state.uploaded_file
     file_type = uploaded_file.type
+    file_name = uploaded_file.name
 
     if file_type in [
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -169,14 +269,14 @@ if st.session_state.uploaded_file is not None:
             )
 
             if selected_sheet is not None:
-                display_dataframe(selected_sheet_name=selected_sheet)
+                display_dataframe(selected_sheet_name=selected_sheet, selected_file_name=file_name)
             # endregion
         else:
             # region Handle Single sheet upload
             selected_sheet = sheet_names[0]
-            display_dataframe(selected_sheet_name=selected_sheet)
+            display_dataframe(selected_sheet_name=selected_sheet, selected_file_name=file_name)
             # endregion
     elif file_type == "text/csv":
-        display_dataframe(uploaded_file=uploaded_file, is_excel=False)
+        display_dataframe(uploaded_file=uploaded_file, selected_file_name=file_name, is_excel=False)
 
 # endregion
