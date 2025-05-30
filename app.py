@@ -126,6 +126,7 @@ def show_pie_chart(df, column, selected_file_name, selected_sheet_name = ""):
     )
     # endregion
 
+@st.dialog("Scatter Plot Result", width="large")
 def display_dataframe(uploaded_file = None, selected_sheet_name = "", selected_file_name = "", is_excel=True):
     if is_excel:
         st.markdown(f"Displayed data from sheet: ```{selected_sheet_name}```")
@@ -242,6 +243,7 @@ def display_tabs(df, selected_sheet_name = "", selected_file_name = ""):
                 st.write("Scatter Plot")
                 # TODO : select axis
             # TODO : display button after select everything
+                # Filter column if every data in a column is NaN / None
 
     # TODO : display tabs (summary, insight and charts)
 
