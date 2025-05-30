@@ -55,15 +55,18 @@ def show_bar_graph(df, x_axis, y_axis, selected_file_name, selected_sheet_name =
     buf = io.BytesIO()
     figure.savefig(buf, format="png", bbox_inches="tight")
     buf.seek(0)
-    
 
-    # Display image in a horizontally scrollable div
+    # Display image in a scrollable div
+    dpi = 100  # Default matplotlib DPI
+    img_width_px = int(fig_width * dpi)
+    img_height_px = int(6 * dpi)
+
     img_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
     st.markdown(
         f"""
-        <div style="overflow-x: auto; width: 100%; padding-bottom: 12px;">
+        <div style="overflow-x: auto; overflow-y: auto; width: 100%; max-height: 800px; padding-bottom: 8px; margin-bottom: 8px">
             <img 
-                style="display: block; min-width: 800px; width: auto; max-width: 100%;" 
+                style="display: block; min-width: {img_width_px}px; min-height: {img_height_px}px; width: auto; height: auto;" 
                 src="data:image/png;base64,{img_base64}" />
         </div>
         """,
