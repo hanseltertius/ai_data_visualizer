@@ -84,6 +84,48 @@ def show_bar_graph(df, x_axis, y_axis, selected_file_name, selected_sheet_name =
     )
     # endregion
 
+@st.dialog("Pie Chart Result", width="large")
+def show_pie_chart(df, column, selected_file_name, selected_sheet_name = ""):
+    # region Setup Pie Chart
+    chart_title = f"Pie Chart of {column} in {selected_file_name}" if not selected_sheet_name else f"Pie Chart of {column} in {selected_file_name} ({selected_sheet_name})"
+    value_counts = df[column].value_counts(dropna=False)
+    fig, ax = plt.subplots(figsize=(8, 8))
+    ax.pie(value_counts, labels=value_counts.index.astype(str), autopct='%1.1f%%', startangle=90)
+    ax.set_title(chart_title)
+    plt.tight_layout()
+    # endregion
+
+    # region Generate Image
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", bbox_inches="tight")
+    buf.seek(0)
+
+    dpi = 100
+    img_width_px = int(8 * dpi)
+    img_height_px = int(8 * dpi)
+    img_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+    st.markdown(
+        f"""
+        <div style="overflow-x: auto; overflow-y: auto; width: 100%; max-height: 800px; margin-bottom: 8px">
+            <img 
+                style="display: block; min-width: {img_width_px}px; min-height: {img_height_px}px; width: auto; height: auto;" 
+                src="data:image/png;base64,{img_base64}" />
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    # endregion
+
+    # region Download Button
+    st.download_button(
+        "Download as PNG",
+        data=buf,
+        file_name="pie_chart.png",
+        mime="image/png",
+        use_container_width=True
+    )
+    # endregion
+
 def display_dataframe(uploaded_file = None, selected_sheet_name = "", selected_file_name = "", is_excel=True):
     if is_excel:
         st.markdown(f"Displayed data from sheet: ```{selected_sheet_name}```")
@@ -149,6 +191,7 @@ def display_tabs(df, selected_sheet_name = "", selected_file_name = ""):
 
         if selected_display_data is not None:
             if selected_display_data == "Bar Chart":
+                # TODO : ini mesti di buat function juga
                 # Filter column if every data in a column is NaN / None
                 numeric_cols = [column for column in df.select_dtypes(include="number").columns if not df[column].isna().all()]
                 categorical_cols = [column for column in df.select_dtypes(exclude="number").columns if not df[column].isna().all()]
@@ -179,11 +222,22 @@ def display_tabs(df, selected_sheet_name = "", selected_file_name = ""):
                             st.error("Y-axis must not be empty.")
                         else:
                             show_bar_graph(df, x_axis, y_axis, selected_file_name, selected_sheet_name)
-
-
             elif selected_display_data == "Pie Chart":
-                st.write("Pie Chart")
-                # TODO : categorize as bla bla bla
+                # TODO : ini mesti di buat function juga
+                # Filter column if every data in a column is NaN / None
+                pie_cols = [col for col in df.columns if not df[col].isna().all()]
+                pie_col = st.selectbox(
+                    "Pie Chart Column",
+                    pie_cols,
+                    index=None,
+                    placeholder="Select a column for pie chart",
+                    key="pie_chart_col"
+                )
+                if st.button("Display", key="display"):
+                    if pie_col is None:
+                        st.error("Please select a column for the pie chart.")
+                    else:
+                        show_pie_chart(df, pie_col, selected_file_name=selected_file_name, selected_sheet_name=selected_sheet_name)
             elif selected_display_data == "Scatter Plot":
                 st.write("Scatter Plot")
                 # TODO : select axis
