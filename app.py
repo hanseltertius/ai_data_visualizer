@@ -47,7 +47,8 @@ def show_bar_graph(df, x_axis, y_axis, selected_file_name, selected_sheet_name =
     axes.set_xlabel(x_axis)
     axes.set_ylabel(y_axis)
     axes.set_title(chart_title)
-    plt.xticks(rotation=45, ha="right")
+    plt.xticks(rotation=45, ha="center")
+    plt.yticks(rotation=45, va="center")
     plt.tight_layout()
     # endregion
 
@@ -89,15 +90,15 @@ def show_pie_chart(df, column, selected_file_name, selected_sheet_name = ""):
     # region Setup Pie Chart
     chart_title = f"Pie Chart of {column} in {selected_file_name}" if not selected_sheet_name else f"Pie Chart of {column} in {selected_file_name} ({selected_sheet_name})"
     value_counts = df[column].value_counts(dropna=False)
-    fig, ax = plt.subplots(figsize=(8, 8))
-    ax.pie(value_counts, labels=value_counts.index.astype(str), autopct='%1.1f%%', startangle=90)
-    ax.set_title(chart_title)
+    figure, axes = plt.subplots(figsize=(8, 8))
+    axes.pie(value_counts, labels=value_counts.index.astype(str), autopct='%1.1f%%', startangle=90)
+    axes.set_title(chart_title)
     plt.tight_layout()
     # endregion
 
     # region Generate Image
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight")
+    figure.savefig(buf, format="png", bbox_inches="tight")
     buf.seek(0)
 
     dpi = 100
@@ -259,7 +260,7 @@ def display_tabs(df, selected_sheet_name = "", selected_file_name = ""):
                         key="bar_y_axis"
                     )
 
-                    if st.button("Display", key="display_bar_chart"):
+                    if st.button("Display", key="display_bar_chart", use_container_width=True):
                         if x_axis is None:
                             st.error("X-axis must not be empty.")
                         elif y_axis is None:
@@ -277,7 +278,7 @@ def display_tabs(df, selected_sheet_name = "", selected_file_name = ""):
                     placeholder="Select a column for pie chart",
                     key="pie_chart_col"
                 )
-                if st.button("Display", key="display"):
+                if st.button("Display", key="display_pie_chart", use_container_width=True):
                     if pie_col is None:
                         st.error("Please select a column for the pie chart.")
                     else:
