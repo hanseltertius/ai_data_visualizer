@@ -128,6 +128,48 @@ def show_pie_chart(df, column, selected_file_name, selected_sheet_name = ""):
 
 @st.dialog("Scatter Plot Result", width="large")
 def show_scatter_plot(df, x_axis, y_axis, selected_file_name, selected_sheet_name=""):
+    # region Setup Scatter Plot
+    chart_title = f"Scatter Plot of {y_axis} vs {x_axis} in {selected_file_name}" if not selected_sheet_name else f"Scatter Plot of {y_axis} vs {x_axis} in {selected_file_name} ({selected_sheet_name})"
+    figure, axes = plt.subplots(figsize=(8, 6))
+    axes.scatter(df[x_axis], df[y_axis], alpha=0.7)
+    axes.set_xlabel(x_axis)
+    axes.set_ylabel(y_axis)
+    axes.set_title(chart_title)
+    plt.xticks(rotation=45, ha="center")
+    plt.yticks(rotation=45, va="center")
+    plt.tight_layout()
+    # endregion
+
+    # region Generate Image
+    buf = io.BytesIO()
+    figure.savefig(buf, format="png", bbox_inches="tight")
+    buf.seek(0)
+    dpi = 100
+    img_width_px = int(8 * dpi)
+    img_height_px = int(6 * dpi)
+    img_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+    st.markdown(
+        f"""
+        <div style="overflow-x: auto; overflow-y: auto; width: 100%; max-height: 800px; padding-bottom: 8px; margin-bottom: 8px">
+            <img 
+                style="display: block; min-width: {img_width_px}px; min-height: {img_height_px}px; width: auto; height: auto;" 
+                src="data:image/png;base64,{img_base64}" />
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    # endregion
+
+    # region Download Button
+    st.download_button(
+        "Download as PNG",
+        data=buf,
+        file_name="bar_chart.png",
+        mime="image/png",
+        use_container_width=True
+    )
+    # endregion
+
 def display_dataframe(uploaded_file = None, selected_sheet_name = "", selected_file_name = "", is_excel=True):
     if is_excel:
         st.markdown(f"Displayed data from sheet: ```{selected_sheet_name}```")
@@ -241,11 +283,37 @@ def display_tabs(df, selected_sheet_name = "", selected_file_name = ""):
                     else:
                         show_pie_chart(df, pie_col, selected_file_name=selected_file_name, selected_sheet_name=selected_sheet_name)
             elif selected_display_data == "Scatter Plot":
-                st.write("Scatter Plot")
-                # TODO : select axis
-            # TODO : display button after select everything
                 # Filter column if every data in a column is NaN / None
                 numeric_cols = [column for column in df.select_dtypes(include="number").columns if not df[column].isna().all()]
+                categorical_cols = [column for column in df.select_dtypes(exclude="number").columns if not df[column].isna().all()]
+                if len(numeric_cols) == 0:
+                    st.warning("No numerical columns available, please re-upload the data with numeric columns")
+                elif len(categorical_cols) == 0:
+                    st.warning("No categorical columns available, please re-upload the data with categorical columns")
+                else:                    
+                    x_axis = st.selectbox(
+                        "X-axis",
+                        numeric_cols,
+                        index=None,
+                        placeholder="Select X-axis (numeric column)",
+                        key="scatter_x_axis"
+                    )
+
+                    y_axis = st.selectbox(
+                        "Y-axis",
+                        categorical_cols,
+                        index=None,
+                        placeholder="Select Y-axis (numeric column)",
+                        key="scatter_y_axis"
+                    )
+
+                    if st.button("Display", key="display_scatter_plot", use_container_width=True):
+                        if x_axis is None:
+                            st.error("X-axis must not be empty.")
+                        elif y_axis is None:
+                            st.error("Y-axis must not be empty.")
+                        else:
+                            show_scatter_plot(df, x_axis, y_axis, selected_file_name, selected_sheet_name)
 
     # TODO : display tabs (summary, insight and charts)
 
