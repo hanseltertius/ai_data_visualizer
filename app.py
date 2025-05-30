@@ -144,12 +144,11 @@ def display_tabs(df, selected_sheet_name = "", selected_file_name = ""):
             key="displayed_data_selector"
         )
 
-        # TODO : if change selection => display the option first, then press display
         if selected_display_data is not None:
             if selected_display_data == "Bar Chart":
-                # TODO : ini mungkin juga perlu handle data type yang aneh2 atau column yang kosong, sbnrnya kan ada condition seperti itu
-                numeric_cols = df.select_dtypes(include="number").columns
-                categorical_cols = df.select_dtypes(exclude="number").columns
+                # Filter column if every data in a column is NaN / None
+                numeric_cols = [column for column in df.select_dtypes(include="number").columns if not df[column].isna().all()]
+                categorical_cols = [column for column in df.select_dtypes(exclude="number").columns if not df[column].isna().all()]
                 if len(numeric_cols) == 0:
                     st.warning("No numerical columns available, please re-upload the data with numeric columns")
                 elif len(categorical_cols) == 0:
