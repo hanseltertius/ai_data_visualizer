@@ -186,14 +186,51 @@ def display_tabs(df, selected_sheet_name = "", selected_file_name = ""):
     tab_summary, tab_insight, tab_chart = st.tabs(["Summary", "Insight", "Chart"])
 
     with tab_summary:
-        # TODO : maybe using a summary again, inside tab there is another tab
-        # TODO : summarize columns by (select columns)
-        # TODO : do summary of the tabs
-        # st.write(df.describe())
-        # st.write(df.info())
-        st.write("Summary")
+        overall_summary, summary_by_column = st.tabs(["Overall", "Summary by Column(s)"])
 
-        # TODO : maybe we can summarize from 2 columns and some stuff, maybe can select multiple columns to generate summary, ini mesti dapat info2 dari dataframe bgmn, we can select all of the columns, depending on the selection
+        with overall_summary:
+            st.subheader("Overall Data Summary")
+            # region Rows Count
+            num_rows = len(df)
+            st.markdown(f"**Rows Count:** ```{num_rows}```")
+            # endregion
+
+            # region Numeric Columns
+            numeric_cols = df.select_dtypes(include="number").columns.tolist()
+            num_numeric_cols = len(numeric_cols)
+            st.markdown(f"**Numeric Columns Count:** ```{num_numeric_cols}```")
+            if num_numeric_cols > 0:
+                st.markdown("**Numeric Columns**")
+                st.markdown("\n".join([f"{index + 1}. {col_name}" for index, col_name in enumerate(numeric_cols)]))
+            # endregion
+
+            # region Data Types
+            st.markdown(f"**Data Types**")
+            datatypes_df = df.dtypes.reset_index()
+            datatypes_df.columns = ["Name", "Datatype"]
+            st.dataframe(datatypes_df, hide_index=True)
+            # endregion
+
+            # region Missing Values
+            st.markdown("**Missing Values**")
+            missing_df = df.isnull().sum().reset_index()
+            missing_df.columns = ["Name", "Count"]
+            st.dataframe(missing_df, hide_index=True)
+            # endregion
+
+            # region Statistics (Numeric Columns Only)
+            if num_numeric_cols > 0:
+                st.write("**Statistics (Display Numeric Columns Only)**")
+                st.write(df.describe())
+            # endregion
+
+        with summary_by_column:
+            st.subheader("Summary by Selected Column(s)")
+            # selected_columns = st.multiselect()
+            # # TODO : generate summary by columns
+            # st.write("Summary by Column")
+            # TODO : maybe we can summarize from 2 columns and some stuff, maybe can select multiple columns to generate summary, ini mesti dapat info2 dari dataframe bgmn, we can select all of the columns, depending on the selection
+            
 
     with tab_insight:
         # TODO : create method for display insight in full, to make the code more clean and neat
