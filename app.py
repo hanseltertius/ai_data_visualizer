@@ -223,15 +223,84 @@ def display_tabs(df, selected_sheet_name = "", selected_file_name = ""):
                 st.write("**Statistics (Display Numeric Columns Only)**")
                 st.write(df.describe())
             # endregion
-
         with summary_by_column:
             st.subheader("Summary by Selected Column(s)")
-            # selected_columns = st.multiselect()
-            # # TODO : generate summary by columns
-            # st.write("Summary by Column")
-            # TODO : maybe we can summarize from 2 columns and some stuff, maybe can select multiple columns to generate summary, ini mesti dapat info2 dari dataframe bgmn, we can select all of the columns, depending on the selection
-            
+            selected_columns = st.multiselect(
+                "Select column(s)",
+                df.columns.tolist(),
+                key="selected_columns"
+            )
 
+            if st.button("Summarize", key="summarize", use_container_width=True):
+                if selected_columns:
+                    for col in selected_columns:
+                        with st.expander(f"Column {col}", expanded=True):
+                            # region General Summary
+                            st.markdown("#### General Summary")
+                            st.markdown(f"**Type:** `{df[col].dtype}`")
+                            st.markdown(f"**Missing values:** `{df[col].isnull().sum()}`")
+                            st.markdown(f"**Unique values:** `{df[col].nunique()}`")
+                            st.markdown('<hr style="border: 1px solid #bbb; margin-top: 8px; margin-bottom: 8px;">', unsafe_allow_html=True)
+                            # endregion
+
+                            # region Value Specific Summary
+                            st.markdown("#### Value Specific Summary")
+                            if pd.api.types.is_numeric_dtype(df[col]):
+                                # region Numeric Columns
+
+                                # region Numeric Values Summary
+                                st.markdown("##### Numeric Values Summary")
+                                st.write(df[col].describe())
+                                # endregion
+
+                                # region Count Values
+                                st.markdown("##### Count Values")
+                                st.write(df[col].value_counts(dropna=False))
+                                # endregion
+
+                                # endregion
+                            elif pd.api.types.is_datetime64_any_dtype(df[col]):
+                                # region Datetime Columns
+                                
+                                # region Earliest and Latest
+                                st.markdown(f"**Earliest:** {df[col].min().strftime('%A, %d %B %Y') if not pd.isnull(df[col].min()) else 'N/A'}")
+                                st.markdown(f"**Latest:** {df[col].max().strftime('%A, %d %B %Y') if not pd.isnull(df[col].max()) else 'N/A'}")
+                                # endregion
+
+                                # region Most Frequent Date
+                                mode_date = df[col].mode()
+                                st.markdown(f"**Most Frequent Date:** {mode_date[0].strftime('%A, %d %B %Y') if not mode_date.empty else "N/A"}")
+                                # endregion
+
+                                # region Most Frequent Day Name
+                                mode_day = df[col].dt.day_name().mode()
+                                st.markdown(f"**Most Frequent Day:** {mode_day[0] if not mode_day.empty else "N/A"}")
+                                # endregion
+
+                                # region Count Values
+                                st.markdown("##### Count Values")
+                                st.write(df[col].value_counts(dropna=False))
+                                # endregion
+
+                                # endregion
+                            else:
+                                # region Categorical Columns
+                                categorical_values_count = df[col].value_counts(dropna=False)
+
+                                # region Most Frequent Value
+                                mode_value = df[col].mode()
+                                st.markdown(f"**Most Frequent Value:** {mode_value[0] if not mode_value.empty else "N/A"}")
+                                # endregion
+
+                                # region Count Values
+                                st.markdown("##### Count Values")
+                                st.write(categorical_values_count)
+                                # endregion
+
+                                # endregion
+                            # endregion
+                else:
+                    st.error("Please select at least 1 column to summarize.")
     with tab_insight:
         # TODO : create method for display insight in full, to make the code more clean and neat
         user_input = st.text_area(
