@@ -173,14 +173,38 @@ def show_scatter_plot(df, x_axis, y_axis, selected_file_name, selected_sheet_nam
 
 def display_dataframe(uploaded_file = None, selected_sheet_name = "", selected_file_name = "", is_excel=True):
     if is_excel:
-        st.markdown(f"Displayed data from sheet: ```{selected_sheet_name}```")
-        df = pd.read_excel(excel_file, sheet_name=selected_sheet_name)
-        st.dataframe(df)
-        display_tabs(df, selected_sheet_name=selected_sheet_name, selected_file_name=selected_file_name)
+        # region Display DataFrame from Excel
+        try:
+            st.markdown(f"Displayed data from sheet: ```{selected_sheet_name}```")
+            df = pd.read_excel(excel_file, sheet_name=selected_sheet_name)
+            if df.empty or len(df.columns) == 0:
+                st.error("The selected Excel sheet has no columns or data.")
+                return
+            st.dataframe(df)
+            display_tabs(df, selected_sheet_name=selected_sheet_name, selected_file_name=selected_file_name)
+        except Exception as e:
+            st.error(f"Failed to read the Excel file or sheet: {e}")
+        # endregion
     else:
-        df = pd.read_csv(uploaded_file)
-        st.dataframe(df)
-        display_tabs(df, selected_sheet_name=selected_sheet_name, selected_file_name=selected_file_name)
+        # region Display DataFrame from CSV
+        # Check if file is empty or invalid before reading
+        uploaded_file.seek(0)
+        content = uploaded_file.read()
+        if not content.strip():
+            st.error("The uploaded CSV file is empty.")
+            return
+        # Reset pointer after reading
+        uploaded_file.seek(0)  
+        try:
+            df = pd.read_csv(uploaded_file)
+            if df.empty or len(df.columns) == 0:
+                st.error("The uploaded CSV file has no columns or data.")
+                return
+            st.dataframe(df)
+            display_tabs(df, selected_sheet_name=selected_sheet_name, selected_file_name=selected_file_name)
+        except pd.errors.EmptyDataError:
+            st.error("The uploaded CSV file is empty or invalid.")
+        # endregion
 
 def display_tabs(df, selected_sheet_name = "", selected_file_name = ""):
     tab_summary, tab_insight, tab_chart = st.tabs(["Summary", "Insight", "Chart"])
@@ -220,7 +244,7 @@ def display_tabs(df, selected_sheet_name = "", selected_file_name = ""):
 
             # region Statistics (Numeric Columns Only)
             if num_numeric_cols > 0:
-                st.write("**Statistics (Display Numeric Columns Only)**")
+                st.markdown("**Statistics (Display Numeric Columns Only)**")
                 st.write(df.describe())
             # endregion
         with summary_by_column:
@@ -302,7 +326,7 @@ def display_tabs(df, selected_sheet_name = "", selected_file_name = ""):
                 else:
                     st.error("Please select at least 1 column to summarize.")
     with tab_insight:
-        # TODO : create method for display insight in full, to make the code more clean and neat
+        # TODO : create method for display insight in full, to make the code more clean and neat (display_insight_layout)
         user_input = st.text_area(
             label="Insight",
             key="insight_input", 
@@ -489,29 +513,38 @@ if st.session_state.uploaded_file is not None:
         "application/vnd.ms-excel",
         "application/vnd.ms-excel.sheet.macroEnabled.12"
     ]:
-        uploaded_file.seek(0) # Reset file upload
-        excel_file = pd.ExcelFile(uploaded_file)
-        sheet_names = excel_file.sheet_names
+        try:
+            excel_file = pd.ExcelFile(uploaded_file)
+            sheet_names = excel_file.sheet_names
 
-        if len(sheet_names) > 1:
-            # region Handle Multiple Sheets upload
-            selected_sheet = st.selectbox(
-                "Sheet Name",
-                sheet_names,
-                index=None,
-                placeholder="Select a sheet to visualize",
-                key="sheet_selector"
-            )
+            if not sheet_names:
+                st.error("The uploaded Excel file contains no sheets.")
+            else:
+                if len(sheet_names) > 1:
+                    # region Handle Multiple Sheets upload
+                    selected_sheet = st.selectbox(
+                        "Sheet Name",
+                        sheet_names,
+                        index=None,
+                        placeholder="Select a sheet to visualize",
+                        key="sheet_selector"
+                    )
 
-            if selected_sheet is not None:
-                display_dataframe(selected_sheet_name=selected_sheet, selected_file_name=file_name)
-            # endregion
-        else:
-            # region Handle Single sheet upload
-            selected_sheet = sheet_names[0]
-            display_dataframe(selected_sheet_name=selected_sheet, selected_file_name=file_name)
-            # endregion
+                    if selected_sheet is not None:
+                        display_dataframe(selected_sheet_name=selected_sheet, selected_file_name=file_name)
+                    # endregion
+                else:
+                    # region Handle Single sheet upload
+                    selected_sheet = sheet_names[0]
+                    display_dataframe(selected_sheet_name=selected_sheet, selected_file_name=file_name)
+                    # endregion
+        except Exception as e:
+            st.error(f"Failed to read the Excel file: {e}")
     elif file_type == "text/csv":
-        display_dataframe(uploaded_file=uploaded_file, selected_file_name=file_name, is_excel=False)
+        display_dataframe(
+            uploaded_file=uploaded_file,
+            selected_file_name=file_name,
+            is_excel=False
+        )
 
 # endregion
