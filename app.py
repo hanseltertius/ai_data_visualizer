@@ -371,9 +371,39 @@ def display_tabs(df, selected_sheet_name = "", selected_file_name = ""):
                             # region Categorical Columns
                             categorical_values_count = df[col].value_counts(dropna=False)
 
-                            # region Most Frequent Value
-                            mode_value = df[col].mode()
-                            st.markdown(f"**Most Frequent Value:** {mode_value[0] if not mode_value.empty else "N/A"}")
+                            # region Categorical Values Summary
+
+                            # region Prepare Values for Categorical Columns
+                            value_counts = df[col].value_counts(dropna=False)
+                            mode_values = df[col].mode()
+                            min_count = value_counts.min()
+                            min_values = value_counts[value_counts == min_count]
+                            least_frequent_values = min_values.index.tolist() if not min_values.empty else []
+                            # endregion
+
+                            # region Format values for display
+                            options = [
+                                ("Most Frequent Value(s)", ", ".join(mode_values.tolist()) if not mode_values.empty else "N/A"),
+                                ("Least Frequent Value(s)", ", ".join(least_frequent_values))
+                            ]
+
+                            options = [("All Values", options)] + options
+
+                            selected = st.selectbox(
+                                "Select datetime statistic to display",
+                                options=options,
+                                format_func=lambda x: x[0],
+                                key=f"datetime_{col}"
+                            )
+
+                            st.markdown("##### Categorical Values Summary")
+                            if selected[0] == "All Values":
+                                for label, value in selected[1]:
+                                    st.markdown(f"- **{label}:** `{value}`")
+                            else:
+                                st.markdown(f"**{selected[0]}:** `{selected[1]}`")
+                            # endregion
+
                             # endregion
 
                             # region Count Values
@@ -506,8 +536,6 @@ def display_tabs(df, selected_sheet_name = "", selected_file_name = ""):
                             st.error("Y-axis must not be empty.")
                         else:
                             show_scatter_plot(df, x_axis, y_axis, selected_file_name, selected_sheet_name)
-
-    # TODO : display tabs (summary, insight and charts)
 
 def generate_insight_from_openai(user_input, df):
     csv_data = df.to_csv(index=False)
