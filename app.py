@@ -306,8 +306,8 @@ def display_tabs(df, selected_sheet_name = "", selected_file_name = ""):
                                 format_func=lambda x: x[0]
                             )
 
+                            st.markdown("##### Numeric Values Summary")
                             if selected[0] == "All Values":
-                                st.markdown("##### Numeric Values Summary")
                                 for label, value in selected[1]:
                                     st.markdown(f"- **{label}:** `{value}`")
                             else:
