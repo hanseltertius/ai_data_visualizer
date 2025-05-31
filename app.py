@@ -323,19 +323,42 @@ def display_tabs(df, selected_sheet_name = "", selected_file_name = ""):
                         elif pd.api.types.is_datetime64_any_dtype(df[col]):
                             # region Datetime Columns
 
-                            # region Earliest and Latest
-                            st.markdown(f"**Earliest:** {df[col].min().strftime('%A, %d %B %Y') if not pd.isnull(df[col].min()) else 'N/A'}")
-                            st.markdown(f"**Latest:** {df[col].max().strftime('%A, %d %B %Y') if not pd.isnull(df[col].max()) else 'N/A'}")
-                            # endregion
+                            # region Datetime Values Summary
 
-                            # region Most Frequent Date
+                            # region Calculate Values
+                            earliest = df[col].min()
+                            latest = df[col].max()
                             mode_date = df[col].mode()
-                            st.markdown(f"**Most Frequent Date:** {mode_date[0].strftime('%A, %d %B %Y') if not mode_date.empty else "N/A"}")
+                            most_freq_date = mode_date[0] if not mode_date.empty else None
+                            mode_day = df[col].dt.day_name().mode()
+                            most_freq_day = mode_day[0] if not mode_day.empty else None
                             # endregion
 
-                            # region Most Frequent Day Name
-                            mode_day = df[col].dt.day_name().mode()
-                            st.markdown(f"**Most Frequent Day:** {mode_day[0] if not mode_day.empty else "N/A"}")
+                            # region Format Values for Display
+                            summary_tuples = [
+                                ("Earliest", earliest.strftime('%A, %d %B %Y') if pd.notnull(earliest) else "N/A"),
+                                ("Latest", latest.strftime('%A, %d %B %Y') if pd.notnull(latest) else "N/A"),
+                                ("Most Frequent Date", most_freq_date.strftime('%A, %d %B %Y') if most_freq_date is not None and pd.notnull(most_freq_date) else "N/A"),
+                                ("Most Frequent Day", most_freq_day if most_freq_day is not None else "N/A"),
+                            ]
+                            # Add "All" as the first option
+                            options = [("All Values", summary_tuples)] + summary_tuples
+
+                            selected = st.selectbox(
+                                "Select datetime statistic to display",
+                                options=options,
+                                format_func=lambda x: x[0],
+                                key=f"datetime_{col}"
+                            )
+
+                            st.markdown("##### Datetime Values Summary")
+                            if selected[0] == "All Values":
+                                for label, value in selected[1]:
+                                    st.markdown(f"- **{label}:** `{value}`")
+                            else:
+                                st.markdown(f"**{selected[0]}:** `{selected[1]}`")
+                            # endregion
+
                             # endregion
 
                             # region Count Values
