@@ -19,6 +19,12 @@ if "uploaded_file" not in st.session_state:
 
 if "generated_insight" not in st.session_state:
     st.session_state.generated_insight = None
+
+if "display_summarized_columns" not in st.session_state:
+    st.session_state.display_summarized_columns = False
+
+if "last_selected_columns" not in st.session_state:
+    st.session_state.last_selected_columns = []
 # endregion
 
 # region Functions
@@ -255,76 +261,108 @@ def display_tabs(df, selected_sheet_name = "", selected_file_name = ""):
                 key="selected_columns"
             )
 
+            # Reset summarized state if columns change
+            if st.session_state.last_selected_columns != selected_columns:
+                st.session_state.display_summarized_columns = False
+            st.session_state.last_selected_columns = selected_columns
+
             if st.button("Summarize", key="summarize", use_container_width=True):
-                if selected_columns:
-                    for col in selected_columns:
-                        with st.expander(f"Column {col}", expanded=True):
-                            # region General Summary
-                            st.markdown("#### General Summary")
-                            st.markdown(f"**Type:** `{df[col].dtype}`")
-                            st.markdown(f"**Missing values:** `{df[col].isnull().sum()}`")
-                            st.markdown(f"**Unique values:** `{df[col].nunique()}`")
-                            st.markdown('<hr style="border: 1px solid #bbb; margin-top: 8px; margin-bottom: 8px;">', unsafe_allow_html=True)
-                            # endregion
+                st.session_state.display_summarized_columns = True
+            
+            # region Show Expanders if displayed summarized columns
+            if st.session_state.display_summarized_columns and selected_columns:
+                for col in selected_columns:
+                    with st.expander(f"Column {col}", expanded=True):
+                        # region General Summary
+                        st.markdown("#### General Summary")
+                        st.markdown(f"**Type:** `{df[col].dtype}`")
+                        st.markdown(f"**Missing values:** `{df[col].isnull().sum()}`")
+                        st.markdown(f"**Unique values:** `{df[col].nunique()}`")
+                        st.markdown('<hr style="border: 1px solid #bbb; margin-top: 8px; margin-bottom: 8px;">', unsafe_allow_html=True)
+                        # endregion
 
-                            # region Value Specific Summary
-                            st.markdown("#### Value Specific Summary")
-                            if pd.api.types.is_numeric_dtype(df[col]):
-                                # region Numeric Columns
+                        # region Value Specific Summary
+                        st.markdown("#### Value Specific Summary")
+                        if pd.api.types.is_numeric_dtype(df[col]):
+                            # region Numeric Columns
 
-                                # region Numeric Values Summary
+                            # region Numeric Values Summary
+                            # Calculate percentiles and min/max
+                            desc = df[col].describe()
+                            percentiles = [
+                                ("25%", desc["25%"]),
+                                ("50%", desc["50%"]),
+                                ("75%", desc["75%"]),
+                                ("max", desc["max"]),
+                                ("min", desc["min"]),
+                                ("mean", desc["mean"])
+                            ]
+                            # Add "All" as the first option
+                            options = [("All Values", percentiles)] + percentiles
+
+                            selected = st.selectbox(
+                                "Select percentile/statistic to display",
+                                options=options,
+                                format_func=lambda x: x[0]
+                            )
+
+                            if selected[0] == "All Values":
                                 st.markdown("##### Numeric Values Summary")
-                                st.write(df[col].describe())
-                                # endregion
-
-                                # region Count Values
-                                st.markdown("##### Count Values")
-                                st.write(df[col].value_counts(dropna=False))
-                                # endregion
-
-                                # endregion
-                            elif pd.api.types.is_datetime64_any_dtype(df[col]):
-                                # region Datetime Columns
-                                
-                                # region Earliest and Latest
-                                st.markdown(f"**Earliest:** {df[col].min().strftime('%A, %d %B %Y') if not pd.isnull(df[col].min()) else 'N/A'}")
-                                st.markdown(f"**Latest:** {df[col].max().strftime('%A, %d %B %Y') if not pd.isnull(df[col].max()) else 'N/A'}")
-                                # endregion
-
-                                # region Most Frequent Date
-                                mode_date = df[col].mode()
-                                st.markdown(f"**Most Frequent Date:** {mode_date[0].strftime('%A, %d %B %Y') if not mode_date.empty else "N/A"}")
-                                # endregion
-
-                                # region Most Frequent Day Name
-                                mode_day = df[col].dt.day_name().mode()
-                                st.markdown(f"**Most Frequent Day:** {mode_day[0] if not mode_day.empty else "N/A"}")
-                                # endregion
-
-                                # region Count Values
-                                st.markdown("##### Count Values")
-                                st.write(df[col].value_counts(dropna=False))
-                                # endregion
-
-                                # endregion
+                                for label, value in selected[1]:
+                                    st.markdown(f"- **{label}:** `{value}`")
                             else:
-                                # region Categorical Columns
-                                categorical_values_count = df[col].value_counts(dropna=False)
-
-                                # region Most Frequent Value
-                                mode_value = df[col].mode()
-                                st.markdown(f"**Most Frequent Value:** {mode_value[0] if not mode_value.empty else "N/A"}")
-                                # endregion
-
-                                # region Count Values
-                                st.markdown("##### Count Values")
-                                st.write(categorical_values_count)
-                                # endregion
-
-                                # endregion
+                                st.markdown(f"**{selected[0]} value:** `{selected[1]}`")
                             # endregion
-                else:
-                    st.error("Please select at least 1 column to summarize.")
+
+                            # region Count Values
+                            st.markdown("##### Count Values")
+                            st.write(df[col].value_counts(dropna=False))
+                            # endregion
+
+                            # endregion
+                        elif pd.api.types.is_datetime64_any_dtype(df[col]):
+                            # region Datetime Columns
+
+                            # region Earliest and Latest
+                            st.markdown(f"**Earliest:** {df[col].min().strftime('%A, %d %B %Y') if not pd.isnull(df[col].min()) else 'N/A'}")
+                            st.markdown(f"**Latest:** {df[col].max().strftime('%A, %d %B %Y') if not pd.isnull(df[col].max()) else 'N/A'}")
+                            # endregion
+
+                            # region Most Frequent Date
+                            mode_date = df[col].mode()
+                            st.markdown(f"**Most Frequent Date:** {mode_date[0].strftime('%A, %d %B %Y') if not mode_date.empty else "N/A"}")
+                            # endregion
+
+                            # region Most Frequent Day Name
+                            mode_day = df[col].dt.day_name().mode()
+                            st.markdown(f"**Most Frequent Day:** {mode_day[0] if not mode_day.empty else "N/A"}")
+                            # endregion
+
+                            # region Count Values
+                            st.markdown("##### Count Values")
+                            st.write(df[col].value_counts(dropna=False))
+                            # endregion
+
+                            # endregion
+                        else:
+                            # region Categorical Columns
+                            categorical_values_count = df[col].value_counts(dropna=False)
+
+                            # region Most Frequent Value
+                            mode_value = df[col].mode()
+                            st.markdown(f"**Most Frequent Value:** {mode_value[0] if not mode_value.empty else "N/A"}")
+                            # endregion
+
+                            # region Count Values
+                            st.markdown("##### Count Values")
+                            st.write(categorical_values_count)
+                            # endregion
+
+                            # endregion
+                        # endregion
+            elif st.session_state.display_summarized_columns and not selected_columns:
+                st.error("Please select at least 1 column to summarize.")
+            # endregion
     with tab_insight:
         # TODO : create method for display insight in full, to make the code more clean and neat (display_insight_layout)
         user_input = st.text_area(
@@ -484,7 +522,6 @@ def generate_insight_from_openai(user_input, df):
             Failed to generate insight: 
             {e}         
             """)
-        
 # endregion
 
 # region UI
