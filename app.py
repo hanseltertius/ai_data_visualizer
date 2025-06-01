@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import openai
 import io
 import base64
+import numpy as np
 
 # region Initialize API key
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
@@ -152,7 +153,9 @@ def show_scatter_plot(df, x_axis, y_axis, selected_file_name, selected_sheet_nam
     # region Setup Scatter Plot
     chart_title = f"Scatter Plot of {y_axis} vs {x_axis} in {selected_file_name}" if not selected_sheet_name else f"Scatter Plot of {y_axis} vs {x_axis} in {selected_file_name} ({selected_sheet_name})"
     figure, axes = plt.subplots(figsize=(8, 6))
-    axes.scatter(df[x_axis], df[y_axis], alpha=0.7)
+    axes.scatter(
+        df[x_axis], df[y_axis], 
+        c=df[y_axis], cmap="viridis", alpha=0.7)
     axes.set_xlabel(x_axis)
     axes.set_ylabel(y_axis)
     axes.set_title(chart_title)
@@ -309,15 +312,15 @@ def display_scatter_plot(df, selected_file_name, selected_sheet_name=""):
     else:                    
         x_axis = st.selectbox(
             "X-axis",
-            numeric_cols,
+            categorical_cols,
             index=None,
-            placeholder="Select X-axis (numeric column)",
+            placeholder="Select X-axis (categoric columns)",
             key="scatter_x_axis"
         )
 
         y_axis = st.selectbox(
             "Y-axis",
-            categorical_cols,
+            numeric_cols,
             index=None,
             placeholder="Select Y-axis (numeric column)",
             key="scatter_y_axis"
