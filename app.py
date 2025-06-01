@@ -42,6 +42,11 @@ def is_valid_uploaded_file(uploaded_file):
 def reset_uploaded_file():
     st.session_state.uploaded_file = None
 
+def format_column_value(value):
+    if isinstance(value, float):
+        return f"{value:.2f}"
+    return str(value)
+
 @st.dialog("Bar Graph Result", width="large")
 def show_bar_graph(df, x_axis, y_axis, selected_file_name, selected_sheet_name = ""):
     # region Setup Bar Graph
@@ -338,39 +343,109 @@ def display_chart(df, selected_file_name, selected_sheet_name = ""):
 
 def display_overall_summary(df):
     st.subheader("Overall Data Summary")
-    # region Rows Count
-    num_rows = len(df)
-    st.markdown(f"**Rows Count:** ```{num_rows}```")
-    # endregion
 
-    # region Numeric Columns
-    numeric_cols = df.select_dtypes(include="number").columns.tolist()
-    num_numeric_cols = len(numeric_cols)
-    st.markdown(f"**Numeric Columns Count:** ```{num_numeric_cols}```")
-    if num_numeric_cols > 0:
-        st.markdown("**Numeric Columns**")
-        st.markdown("\n".join([f"{index + 1}. {col_name}" for index, col_name in enumerate(numeric_cols)]))
-    # endregion
+    with st.expander("Overall Summary", expanded=True):
 
-    # region Data Types
-    st.markdown(f"**Data Types**")
-    datatypes_df = df.dtypes.reset_index()
-    datatypes_df.columns = ["Name", "Datatype"]
-    st.dataframe(datatypes_df, hide_index=True)
-    # endregion
+        # region Table Information
+        st.markdown("#### Table Information")
+        num_rows = len(df)
+        num_cols = len(df.columns)
+        st.markdown(f"**Rows Count:** ```{num_rows}```")
+        st.markdown(f"**Columns Count:** ```{num_cols}```")
+        st.markdown('<hr style="border: 1px solid #bbb; margin-top: 8px; margin-bottom: 8px;">', unsafe_allow_html=True)
+        # endregion
 
-    # region Missing Values
-    st.markdown("**Missing Values**")
-    missing_df = df.isnull().sum().reset_index()
-    missing_df.columns = ["Name", "Count"]
-    st.dataframe(missing_df, hide_index=True)
-    # endregion
+        # region Columns Information
+        st.markdown("#### Columns Information")
 
-    # region Statistics (Numeric Columns Only)
-    if num_numeric_cols > 0:
-        st.markdown("**Statistics (Display Numeric Columns Only)**")
-        st.write(df.describe())
-    # endregion
+        # region Numeric Columns
+        st.markdown("##### Numeric Columns")
+        numeric_cols = df.select_dtypes(include="number").columns.tolist()
+        num_numeric_cols = len(numeric_cols)
+        st.markdown(f"**Numeric Columns Count:** ```{num_numeric_cols}```")
+        if num_numeric_cols > 0:
+            st.markdown("**List of Numeric Columns:**")
+            st.markdown("\n".join([f"- {col_name}" for col_name in numeric_cols]))
+        st.markdown('<hr style="border: 1px dotted #bbb; margin-top: 8px; margin-bottom: 8px;">', unsafe_allow_html=True)
+        # endregion
+
+        # region DateTime Columns
+        st.markdown("##### DateTime Columns")
+        datetime_cols = df.select_dtypes(include=["datetime", "datetime64[ns]"]).columns.tolist()
+        num_datetime_cols = len(datetime_cols)
+        st.markdown(f"**DateTime Columns Count:** ```{num_datetime_cols}```")
+        if num_datetime_cols > 0:
+            st.markdown("**List of DateTime Columns:**")
+            st.markdown("\n".join([f"- {col_name}" for col_name in datetime_cols]))
+        st.markdown('<hr style="border: 1px dotted #bbb; margin-top: 8px; margin-bottom: 8px;">', unsafe_allow_html=True)
+        # endregion
+
+        # region Categorical Columns
+        st.markdown("##### Categorical Columns")
+        categorical_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
+        num_categorical_cols = len(categorical_cols)
+        st.markdown(f"**Categorical Columns Count:** ```{num_categorical_cols}```")
+        if num_categorical_cols > 0:
+            st.markdown("**List of Categorical Columns:**")
+            st.markdown("\n".join([f"- {col_name}" for col_name in categorical_cols]))
+        # endregion
+        
+        st.markdown('<hr style="border: 1px solid #bbb; margin-top: 8px; margin-bottom: 8px;">', unsafe_allow_html=True)
+        # endregion
+
+        # region Column Data Types
+        st.markdown("#### Column Data Types")
+        datatypes_df = df.dtypes.reset_index()
+        datatypes_df.columns = ["Name", "Datatype"]
+        st.dataframe(datatypes_df, hide_index=True)
+        st.markdown('<hr style="border: 1px solid #bbb; margin-top: 8px; margin-bottom: 8px;">', unsafe_allow_html=True)
+        # endregion
+
+        # region Missing Values
+        st.markdown("#### Missing Values")
+        missing_df = df.isnull().sum().reset_index()
+        missing_df.columns = ["Name", "Count"]
+        st.dataframe(missing_df, hide_index=True)
+        # endregion
+
+        # region Columns with the Most / Least Frequent Value Table
+        most_least_summary = []
+        for col in df.columns:
+            value_counts = df[col].value_counts(dropna=False)
+            if not value_counts.empty:
+                most_frequent_count = value_counts.iloc[0]
+                most_frequent_values = value_counts[value_counts == most_frequent_count].index.tolist()
+
+                least_frequent_count = value_counts.iloc[-1]
+                least_frequent_values = value_counts[value_counts == least_frequent_count].index.tolist()
+
+                most_least_summary.append({
+                    "Column": col,
+                    "Most Frequent Value(s)": ", ".join(format_column_value(v) for v in most_frequent_values),
+                    "Most Freq Count": round(most_frequent_count, 2) if isinstance(most_frequent_count, float) else most_frequent_count,
+                    "Least Frequent Value(s)": ", ".join(format_column_value(v) for v in least_frequent_values),
+                    "Least Freq Count": round(least_frequent_count, 2) if isinstance(least_frequent_count, float) else least_frequent_count
+                })
+            else:
+                most_least_summary.append({
+                    "Column": col,
+                    "Most Frequent Value(s)": "N/A",
+                    "Most Freq Count": "N/A",
+                    "Least Frequent Value(s)": "N/A",
+                    "Least Freq Count": "N/A"
+                })
+        most_least_df = pd.DataFrame(most_least_summary)
+        st.markdown("#### Most/Least Frequent Value(s) per Column")
+        st.dataframe(most_least_df, hide_index=True)
+        st.markdown('<hr style="border: 1px solid #bbb; margin-top: 8px; margin-bottom: 8px;">', unsafe_allow_html=True)
+        # endregion
+
+        # region Statistics (Numeric Columns Only)
+        if num_numeric_cols > 0:
+            st.markdown('<hr style="border: 1px solid #bbb; margin-top: 8px; margin-bottom: 8px;">', unsafe_allow_html=True)
+            st.markdown("#### Statistics (Display Numeric Columns Only)")
+            st.write(df.describe())
+        # endregion
 
 def display_summary_by_columns(df):
     st.subheader("Summary by Selected Column(s)")
