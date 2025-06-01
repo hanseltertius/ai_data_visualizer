@@ -304,27 +304,29 @@ def display_pie_chart(df, selected_file_name, selected_sheet_name=""):
 
 def display_scatter_plot(df, selected_file_name, selected_sheet_name=""):
     numeric_cols = [column for column in df.select_dtypes(include="number").columns if not df[column].isna().all()]
-    categorical_cols = [column for column in df.select_dtypes(exclude="number").columns if not df[column].isna().all()]
-    if len(numeric_cols) == 0:
-        st.warning("No numerical columns available, please re-upload the data with numeric columns")
-    elif len(categorical_cols) == 0:
-        st.warning("No categorical columns available, please re-upload the data with categorical columns")
+    if len(numeric_cols) < 2:
+        st.warning("At least two numerical columns are required to display a scatter plot. Please re-upload the data with more numeric columns.")
     else:                    
         x_axis = st.selectbox(
             "X-axis",
-            categorical_cols,
+            numeric_cols,
             index=None,
-            placeholder="Select X-axis (categoric columns)",
+            placeholder="Select X-axis (numeric column)",
             key="scatter_x_axis"
         )
 
-        y_axis = st.selectbox(
-            "Y-axis",
-            numeric_cols,
-            index=None,
-            placeholder="Select Y-axis (numeric column)",
-            key="scatter_y_axis"
-        )
+        # Only show Y-axis selectbox if X-axis is selected
+        if x_axis is not None:
+            y_axis_options = [col for col in numeric_cols if col != x_axis]
+            y_axis = st.selectbox(
+                "Y-axis",
+                y_axis_options,
+                index=None,
+                placeholder="Select Y-axis (numeric column)",
+                key="scatter_y_axis"
+            )
+        else:
+            y_axis = None
 
         if st.button("Display", key="display_scatter_plot", use_container_width=True):
             if x_axis is None:
