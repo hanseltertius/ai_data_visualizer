@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import openai
 import io
 import base64
-import numpy as np
 
 # region Initialize API key
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
@@ -288,23 +287,30 @@ def display_bar_chart(df, selected_file_name, selected_sheet_name=""):
             elif y_axis is None:
                 st.error("Y-axis must not be empty.")
             else:
-                show_bar_graph(df, x_axis, y_axis, selected_file_name, selected_sheet_name)
+                plot_df = df.dropna(subset=[x_axis, y_axis])    # Drop rows with NaN in x or y axis
+                # Calculate and display average y for each x
+                avg_df = plot_df.groupby(x_axis, dropna=False)[y_axis].mean().reset_index()
+                avg_df.columns = [x_axis, y_axis]
+                show_bar_graph(avg_df, x_axis, y_axis, selected_file_name, selected_sheet_name)
 
 def display_pie_chart(df, selected_file_name, selected_sheet_name=""):
     # Filter column if every data in a column is NaN / None
     pie_cols = [col for col in df.columns if not df[col].isna().all()]
-    pie_col = st.selectbox(
-        "Pie Chart Column",
-        pie_cols,
-        index=None,
-        placeholder="Select a column for pie chart",
-        key="pie_chart_col"
-    )
-    if st.button("Display", key="display_pie_chart", use_container_width=True):
-        if pie_col is None:
-            st.error("Please select a column for the pie chart.")
-        else:
-            show_pie_chart(df, pie_col, selected_file_name=selected_file_name, selected_sheet_name=selected_sheet_name)
+    if len(pie_cols) == 0:
+        st.warning("No columns available, please re-upload the data with valid columns")
+    else:
+        pie_col = st.selectbox(
+            "Pie Chart Column",
+            pie_cols,
+            index=None,
+            placeholder="Select a column for pie chart",
+            key="pie_chart_col"
+        )
+        if st.button("Display", key="display_pie_chart", use_container_width=True):
+            if pie_col is None:
+                st.error("Please select a column for the pie chart.")
+            else:
+                show_pie_chart(df, pie_col, selected_file_name=selected_file_name, selected_sheet_name=selected_sheet_name)
 
 def display_scatter_plot(df, selected_file_name, selected_sheet_name=""):
     numeric_cols = [column for column in df.select_dtypes(include="number").columns if not df[column].isna().all()]
@@ -338,7 +344,8 @@ def display_scatter_plot(df, selected_file_name, selected_sheet_name=""):
             elif y_axis is None:
                 st.error("Y-axis must not be empty.")
             else:
-                show_scatter_plot(df, x_axis, y_axis, selected_file_name, selected_sheet_name)
+                plot_df = df.dropna(subset=[x_axis, y_axis])
+                show_scatter_plot(plot_df, x_axis, y_axis, selected_file_name, selected_sheet_name)
 
 def display_chart(df, selected_file_name, selected_sheet_name = ""):
     if is_empty_columns(df):
