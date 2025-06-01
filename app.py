@@ -212,330 +212,344 @@ def display_dataframe(uploaded_file = None, selected_sheet_name = "", selected_f
             st.error("The uploaded CSV file is empty or invalid.")
         # endregion
 
+def display_insight(df):
+    user_input = st.text_area(
+        label="Insight",
+        key="insight_input", 
+        placeholder="Write your insight here... (Leading / Trailing whitespaces will be trimmed at the input generation)", 
+        label_visibility="hidden"
+    )
+
+    if st.button("Generate Insight", use_container_width=True):
+        reformatted_user_input = user_input.strip()
+        if reformatted_user_input:
+            generate_insight_from_openai(reformatted_user_input, df)
+        else:
+            st.error("Insight input cannot be empty.")
+
+    if st.session_state.get("generated_insight"):
+        st.markdown(st.session_state.generated_insight)
+        st.download_button(
+            label="Download Insight",
+            data=st.session_state.generated_insight,
+            file_name="generated_insight.txt",
+            mime="text/plain",
+            use_container_width=True
+        )
+
+def display_bar_chart(df, selected_file_name, selected_sheet_name=""):
+    # Filter column if every data in a column is NaN / None
+    numeric_cols = [column for column in df.select_dtypes(include="number").columns if not df[column].isna().all()]
+    categorical_cols = [column for column in df.select_dtypes(exclude="number").columns if not df[column].isna().all()]
+    if len(numeric_cols) == 0:
+        st.warning("No numerical columns available, please re-upload the data with numeric columns")
+    elif len(categorical_cols) == 0:
+        st.warning("No categorical columns available, please re-upload the data with categorical columns")
+    else:
+        x_axis = st.selectbox(
+            "X-axis", 
+            categorical_cols,
+            index=None,
+            placeholder= "Select x-axis (categorical columns)",
+            key="bar_x_axis"
+        )
+        y_axis = st.selectbox(
+            "Y-axis", 
+            numeric_cols,
+            index=None,
+            placeholder="Select y-axis (numeric columns)",  
+            key="bar_y_axis"
+        )
+
+        if st.button("Display", key="display_bar_chart", use_container_width=True):
+            if x_axis is None:
+                st.error("X-axis must not be empty.")
+            elif y_axis is None:
+                st.error("Y-axis must not be empty.")
+            else:
+                show_bar_graph(df, x_axis, y_axis, selected_file_name, selected_sheet_name)
+
+def display_pie_chart(df, selected_file_name, selected_sheet_name=""):
+    # Filter column if every data in a column is NaN / None
+    pie_cols = [col for col in df.columns if not df[col].isna().all()]
+    pie_col = st.selectbox(
+        "Pie Chart Column",
+        pie_cols,
+        index=None,
+        placeholder="Select a column for pie chart",
+        key="pie_chart_col"
+    )
+    if st.button("Display", key="display_pie_chart", use_container_width=True):
+        if pie_col is None:
+            st.error("Please select a column for the pie chart.")
+        else:
+            show_pie_chart(df, pie_col, selected_file_name=selected_file_name, selected_sheet_name=selected_sheet_name)
+
+def display_scatter_plot(df, selected_file_name, selected_sheet_name=""):
+    numeric_cols = [column for column in df.select_dtypes(include="number").columns if not df[column].isna().all()]
+    categorical_cols = [column for column in df.select_dtypes(exclude="number").columns if not df[column].isna().all()]
+    if len(numeric_cols) == 0:
+        st.warning("No numerical columns available, please re-upload the data with numeric columns")
+    elif len(categorical_cols) == 0:
+        st.warning("No categorical columns available, please re-upload the data with categorical columns")
+    else:                    
+        x_axis = st.selectbox(
+            "X-axis",
+            numeric_cols,
+            index=None,
+            placeholder="Select X-axis (numeric column)",
+            key="scatter_x_axis"
+        )
+
+        y_axis = st.selectbox(
+            "Y-axis",
+            categorical_cols,
+            index=None,
+            placeholder="Select Y-axis (numeric column)",
+            key="scatter_y_axis"
+        )
+
+        if st.button("Display", key="display_scatter_plot", use_container_width=True):
+            if x_axis is None:
+                st.error("X-axis must not be empty.")
+            elif y_axis is None:
+                st.error("Y-axis must not be empty.")
+            else:
+                show_scatter_plot(df, x_axis, y_axis, selected_file_name, selected_sheet_name)
+
+def display_chart(df, selected_file_name, selected_sheet_name = ""):
+    displayed_data_choices = ["Bar Chart", "Pie Chart", "Scatter Plot"]
+
+    selected_display_data = st.selectbox(
+        "Display in", 
+        displayed_data_choices, 
+        index=None, 
+        placeholder="Select data type to display", 
+        key="displayed_data_selector"
+    )
+
+    if selected_display_data is not None:
+        if selected_display_data == "Bar Chart":
+            display_bar_chart(df, selected_file_name, selected_sheet_name)
+        elif selected_display_data == "Pie Chart":
+            display_pie_chart(df, selected_file_name, selected_sheet_name)
+        elif selected_display_data == "Scatter Plot":
+            display_scatter_plot(df, selected_file_name, selected_sheet_name)
+
+def display_overall_summary(df):
+    st.subheader("Overall Data Summary")
+    # region Rows Count
+    num_rows = len(df)
+    st.markdown(f"**Rows Count:** ```{num_rows}```")
+    # endregion
+
+    # region Numeric Columns
+    numeric_cols = df.select_dtypes(include="number").columns.tolist()
+    num_numeric_cols = len(numeric_cols)
+    st.markdown(f"**Numeric Columns Count:** ```{num_numeric_cols}```")
+    if num_numeric_cols > 0:
+        st.markdown("**Numeric Columns**")
+        st.markdown("\n".join([f"{index + 1}. {col_name}" for index, col_name in enumerate(numeric_cols)]))
+    # endregion
+
+    # region Data Types
+    st.markdown(f"**Data Types**")
+    datatypes_df = df.dtypes.reset_index()
+    datatypes_df.columns = ["Name", "Datatype"]
+    st.dataframe(datatypes_df, hide_index=True)
+    # endregion
+
+    # region Missing Values
+    st.markdown("**Missing Values**")
+    missing_df = df.isnull().sum().reset_index()
+    missing_df.columns = ["Name", "Count"]
+    st.dataframe(missing_df, hide_index=True)
+    # endregion
+
+    # region Statistics (Numeric Columns Only)
+    if num_numeric_cols > 0:
+        st.markdown("**Statistics (Display Numeric Columns Only)**")
+        st.write(df.describe())
+    # endregion
+
+def display_summary_by_columns(df):
+    st.subheader("Summary by Selected Column(s)")
+    selected_columns = st.multiselect(
+        "Select column(s)",
+        df.columns.tolist(),
+        key="selected_columns"
+    )
+
+    # Reset summarized state if columns change
+    if st.session_state.last_selected_columns != selected_columns:
+        st.session_state.display_summarized_columns = False
+    st.session_state.last_selected_columns = selected_columns
+
+    if st.button("Summarize", key="summarize", use_container_width=True):
+        st.session_state.display_summarized_columns = True
+    
+    # region Show Expanders if displayed summarized columns
+    if st.session_state.display_summarized_columns and selected_columns:
+        for col in selected_columns:
+            with st.expander(f"Column {col}", expanded=True):
+                # region General Summary
+                st.markdown("#### General Summary")
+                st.markdown(f"**Type:** `{df[col].dtype}`")
+                st.markdown(f"**Missing values:** `{df[col].isnull().sum()}`")
+                st.markdown(f"**Unique values:** `{df[col].nunique()}`")
+                st.markdown('<hr style="border: 1px solid #bbb; margin-top: 8px; margin-bottom: 8px;">', unsafe_allow_html=True)
+                # endregion
+
+                # region Value Specific Summary
+                st.markdown("#### Value Specific Summary")
+                if pd.api.types.is_numeric_dtype(df[col]):
+                    # region Numeric Columns
+
+                    # region Numeric Values Summary
+                    # Calculate percentiles and min/max
+                    desc = df[col].describe()
+                    percentiles = [
+                        ("25%", desc["25%"]),
+                        ("50%", desc["50%"]),
+                        ("75%", desc["75%"]),
+                        ("max", desc["max"]),
+                        ("min", desc["min"]),
+                        ("mean", desc["mean"])
+                    ]
+                    # Add "All" as the first option
+                    options = [("All Values", percentiles)] + percentiles
+
+                    selected = st.selectbox(
+                        "Select percentile/statistic to display",
+                        options=options,
+                        format_func=lambda x: x[0]
+                    )
+
+                    st.markdown("##### Numeric Values Summary")
+                    if selected[0] == "All Values":
+                        for label, value in selected[1]:
+                            st.markdown(f"- **{label}:** `{value}`")
+                    else:
+                        st.markdown(f"**{selected[0]} value:** `{selected[1]}`")
+                    # endregion
+
+                    # region Count Values
+                    st.markdown("##### Count Values")
+                    st.write(df[col].value_counts(dropna=False))
+                    # endregion
+
+                    # endregion
+                elif pd.api.types.is_datetime64_any_dtype(df[col]):
+                    # region Datetime Columns
+
+                    # region Datetime Values Summary
+
+                    # region Calculate Values
+                    earliest = df[col].min()
+                    latest = df[col].max()
+                    mode_date = df[col].mode()
+                    most_freq_date = mode_date[0] if not mode_date.empty else None
+                    mode_day = df[col].dt.day_name().mode()
+                    most_freq_day = mode_day[0] if not mode_day.empty else None
+                    # endregion
+
+                    # region Format Values for Display
+                    summary_tuples = [
+                        ("Earliest", earliest.strftime('%A, %d %B %Y') if pd.notnull(earliest) else "N/A"),
+                        ("Latest", latest.strftime('%A, %d %B %Y') if pd.notnull(latest) else "N/A"),
+                        ("Most Frequent Date", most_freq_date.strftime('%A, %d %B %Y') if most_freq_date is not None and pd.notnull(most_freq_date) else "N/A"),
+                        ("Most Frequent Day", most_freq_day if most_freq_day is not None else "N/A"),
+                    ]
+                    # Add "All" as the first option
+                    options = [("All Values", summary_tuples)] + summary_tuples
+
+                    selected = st.selectbox(
+                        "Select datetime statistic to display",
+                        options=options,
+                        format_func=lambda x: x[0],
+                        key=f"datetime_{col}"
+                    )
+
+                    st.markdown("##### Datetime Values Summary")
+                    if selected[0] == "All Values":
+                        for label, value in selected[1]:
+                            st.markdown(f"- **{label}:** `{value}`")
+                    else:
+                        st.markdown(f"**{selected[0]}:** `{selected[1]}`")
+                    # endregion
+
+                    # endregion
+
+                    # region Count Values
+                    st.markdown("##### Count Values")
+                    st.write(df[col].value_counts(dropna=False))
+                    # endregion
+
+                    # endregion
+                else:
+                    # region Categorical Columns
+                    categorical_values_count = df[col].value_counts(dropna=False)
+
+                    # region Categorical Values Summary
+
+                    # region Prepare Values for Categorical Columns
+                    value_counts = df[col].value_counts(dropna=False)
+                    mode_values = df[col].mode()
+                    min_count = value_counts.min()
+                    min_values = value_counts[value_counts == min_count]
+                    least_frequent_values = min_values.index.tolist() if not min_values.empty else []
+                    # endregion
+
+                    # region Format values for display
+                    options = [
+                        ("Most Frequent Value(s)", ", ".join(mode_values.tolist()) if not mode_values.empty else "N/A"),
+                        ("Least Frequent Value(s)", ", ".join(least_frequent_values))
+                    ]
+
+                    options = [("All Values", options)] + options
+
+                    selected = st.selectbox(
+                        "Select datetime statistic to display",
+                        options=options,
+                        format_func=lambda x: x[0],
+                        key=f"datetime_{col}"
+                    )
+
+                    st.markdown("##### Categorical Values Summary")
+                    if selected[0] == "All Values":
+                        for label, value in selected[1]:
+                            st.markdown(f"- **{label}:** `{value}`")
+                    else:
+                        st.markdown(f"**{selected[0]}:** `{selected[1]}`")
+                    # endregion
+
+                    # endregion
+
+                    # region Count Values
+                    st.markdown("##### Count Values")
+                    st.write(categorical_values_count)
+                    # endregion
+
+                    # endregion
+                # endregion
+    elif st.session_state.display_summarized_columns and not selected_columns:
+        st.error("Please select at least 1 column to summarize.")
+    # endregion
+
 def display_tabs(df, selected_sheet_name = "", selected_file_name = ""):
     tab_summary, tab_insight, tab_chart = st.tabs(["Summary", "Insight", "Chart"])
 
     with tab_summary:
-        overall_summary, summary_by_column = st.tabs(["Overall", "Summary by Column(s)"])
+        overall_summary, summary_by_columns = st.tabs(["Overall", "Summary by Column(s)"])
 
         with overall_summary:
-            st.subheader("Overall Data Summary")
-            # region Rows Count
-            num_rows = len(df)
-            st.markdown(f"**Rows Count:** ```{num_rows}```")
-            # endregion
-
-            # region Numeric Columns
-            numeric_cols = df.select_dtypes(include="number").columns.tolist()
-            num_numeric_cols = len(numeric_cols)
-            st.markdown(f"**Numeric Columns Count:** ```{num_numeric_cols}```")
-            if num_numeric_cols > 0:
-                st.markdown("**Numeric Columns**")
-                st.markdown("\n".join([f"{index + 1}. {col_name}" for index, col_name in enumerate(numeric_cols)]))
-            # endregion
-
-            # region Data Types
-            st.markdown(f"**Data Types**")
-            datatypes_df = df.dtypes.reset_index()
-            datatypes_df.columns = ["Name", "Datatype"]
-            st.dataframe(datatypes_df, hide_index=True)
-            # endregion
-
-            # region Missing Values
-            st.markdown("**Missing Values**")
-            missing_df = df.isnull().sum().reset_index()
-            missing_df.columns = ["Name", "Count"]
-            st.dataframe(missing_df, hide_index=True)
-            # endregion
-
-            # region Statistics (Numeric Columns Only)
-            if num_numeric_cols > 0:
-                st.markdown("**Statistics (Display Numeric Columns Only)**")
-                st.write(df.describe())
-            # endregion
-        with summary_by_column:
-            st.subheader("Summary by Selected Column(s)")
-            selected_columns = st.multiselect(
-                "Select column(s)",
-                df.columns.tolist(),
-                key="selected_columns"
-            )
-
-            # Reset summarized state if columns change
-            if st.session_state.last_selected_columns != selected_columns:
-                st.session_state.display_summarized_columns = False
-            st.session_state.last_selected_columns = selected_columns
-
-            if st.button("Summarize", key="summarize", use_container_width=True):
-                st.session_state.display_summarized_columns = True
-            
-            # region Show Expanders if displayed summarized columns
-            if st.session_state.display_summarized_columns and selected_columns:
-                for col in selected_columns:
-                    with st.expander(f"Column {col}", expanded=True):
-                        # region General Summary
-                        st.markdown("#### General Summary")
-                        st.markdown(f"**Type:** `{df[col].dtype}`")
-                        st.markdown(f"**Missing values:** `{df[col].isnull().sum()}`")
-                        st.markdown(f"**Unique values:** `{df[col].nunique()}`")
-                        st.markdown('<hr style="border: 1px solid #bbb; margin-top: 8px; margin-bottom: 8px;">', unsafe_allow_html=True)
-                        # endregion
-
-                        # region Value Specific Summary
-                        st.markdown("#### Value Specific Summary")
-                        if pd.api.types.is_numeric_dtype(df[col]):
-                            # region Numeric Columns
-
-                            # region Numeric Values Summary
-                            # Calculate percentiles and min/max
-                            desc = df[col].describe()
-                            percentiles = [
-                                ("25%", desc["25%"]),
-                                ("50%", desc["50%"]),
-                                ("75%", desc["75%"]),
-                                ("max", desc["max"]),
-                                ("min", desc["min"]),
-                                ("mean", desc["mean"])
-                            ]
-                            # Add "All" as the first option
-                            options = [("All Values", percentiles)] + percentiles
-
-                            selected = st.selectbox(
-                                "Select percentile/statistic to display",
-                                options=options,
-                                format_func=lambda x: x[0]
-                            )
-
-                            st.markdown("##### Numeric Values Summary")
-                            if selected[0] == "All Values":
-                                for label, value in selected[1]:
-                                    st.markdown(f"- **{label}:** `{value}`")
-                            else:
-                                st.markdown(f"**{selected[0]} value:** `{selected[1]}`")
-                            # endregion
-
-                            # region Count Values
-                            st.markdown("##### Count Values")
-                            st.write(df[col].value_counts(dropna=False))
-                            # endregion
-
-                            # endregion
-                        elif pd.api.types.is_datetime64_any_dtype(df[col]):
-                            # region Datetime Columns
-
-                            # region Datetime Values Summary
-
-                            # region Calculate Values
-                            earliest = df[col].min()
-                            latest = df[col].max()
-                            mode_date = df[col].mode()
-                            most_freq_date = mode_date[0] if not mode_date.empty else None
-                            mode_day = df[col].dt.day_name().mode()
-                            most_freq_day = mode_day[0] if not mode_day.empty else None
-                            # endregion
-
-                            # region Format Values for Display
-                            summary_tuples = [
-                                ("Earliest", earliest.strftime('%A, %d %B %Y') if pd.notnull(earliest) else "N/A"),
-                                ("Latest", latest.strftime('%A, %d %B %Y') if pd.notnull(latest) else "N/A"),
-                                ("Most Frequent Date", most_freq_date.strftime('%A, %d %B %Y') if most_freq_date is not None and pd.notnull(most_freq_date) else "N/A"),
-                                ("Most Frequent Day", most_freq_day if most_freq_day is not None else "N/A"),
-                            ]
-                            # Add "All" as the first option
-                            options = [("All Values", summary_tuples)] + summary_tuples
-
-                            selected = st.selectbox(
-                                "Select datetime statistic to display",
-                                options=options,
-                                format_func=lambda x: x[0],
-                                key=f"datetime_{col}"
-                            )
-
-                            st.markdown("##### Datetime Values Summary")
-                            if selected[0] == "All Values":
-                                for label, value in selected[1]:
-                                    st.markdown(f"- **{label}:** `{value}`")
-                            else:
-                                st.markdown(f"**{selected[0]}:** `{selected[1]}`")
-                            # endregion
-
-                            # endregion
-
-                            # region Count Values
-                            st.markdown("##### Count Values")
-                            st.write(df[col].value_counts(dropna=False))
-                            # endregion
-
-                            # endregion
-                        else:
-                            # region Categorical Columns
-                            categorical_values_count = df[col].value_counts(dropna=False)
-
-                            # region Categorical Values Summary
-
-                            # region Prepare Values for Categorical Columns
-                            value_counts = df[col].value_counts(dropna=False)
-                            mode_values = df[col].mode()
-                            min_count = value_counts.min()
-                            min_values = value_counts[value_counts == min_count]
-                            least_frequent_values = min_values.index.tolist() if not min_values.empty else []
-                            # endregion
-
-                            # region Format values for display
-                            options = [
-                                ("Most Frequent Value(s)", ", ".join(mode_values.tolist()) if not mode_values.empty else "N/A"),
-                                ("Least Frequent Value(s)", ", ".join(least_frequent_values))
-                            ]
-
-                            options = [("All Values", options)] + options
-
-                            selected = st.selectbox(
-                                "Select datetime statistic to display",
-                                options=options,
-                                format_func=lambda x: x[0],
-                                key=f"datetime_{col}"
-                            )
-
-                            st.markdown("##### Categorical Values Summary")
-                            if selected[0] == "All Values":
-                                for label, value in selected[1]:
-                                    st.markdown(f"- **{label}:** `{value}`")
-                            else:
-                                st.markdown(f"**{selected[0]}:** `{selected[1]}`")
-                            # endregion
-
-                            # endregion
-
-                            # region Count Values
-                            st.markdown("##### Count Values")
-                            st.write(categorical_values_count)
-                            # endregion
-
-                            # endregion
-                        # endregion
-            elif st.session_state.display_summarized_columns and not selected_columns:
-                st.error("Please select at least 1 column to summarize.")
-            # endregion
+            display_overall_summary(df)
+        with summary_by_columns:
+            display_summary_by_columns(df)
     with tab_insight:
-        # TODO : create method for display insight in full, to make the code more clean and neat (display_insight_layout)
-        user_input = st.text_area(
-            label="Insight",
-            key="insight_input", 
-            placeholder="Write your insight here... (Leading / Trailing whitespaces will be trimmed at the input generation)", 
-            label_visibility="hidden"
-        )
-
-        if st.button("Generate Insight", use_container_width=True):
-            reformatted_user_input = user_input.strip()
-            if reformatted_user_input:
-                generate_insight_from_openai(reformatted_user_input, df)
-            else:
-                st.error("Insight input cannot be empty.")
-
-        if st.session_state.get("generated_insight"):
-            st.markdown(st.session_state.generated_insight)
-            st.download_button(
-                label="Download Insight",
-                data=st.session_state.generated_insight,
-                file_name="generated_insight.txt",
-                mime="text/plain",
-                use_container_width=True
-            )
+        display_insight(df)
     with tab_chart:
-        # TODO : tinggal generate the chart based on select box
-        # TODO : setelah pake generate the chart based on select box, tinggal pake button, trus generate popup ny
-        # TODO : generate summary
-        displayed_data_choices = ["Bar Chart", "Pie Chart", "Scatter Plot"]
-
-        selected_display_data = st.selectbox(
-            "Display in", 
-            displayed_data_choices, 
-            index=None, 
-            placeholder="Select data type to display", 
-            key="displayed_data_selector"
-        )
-
-        if selected_display_data is not None:
-            if selected_display_data == "Bar Chart":
-                # TODO : ini mesti di buat function juga
-                # Filter column if every data in a column is NaN / None
-                numeric_cols = [column for column in df.select_dtypes(include="number").columns if not df[column].isna().all()]
-                categorical_cols = [column for column in df.select_dtypes(exclude="number").columns if not df[column].isna().all()]
-                if len(numeric_cols) == 0:
-                    st.warning("No numerical columns available, please re-upload the data with numeric columns")
-                elif len(categorical_cols) == 0:
-                    st.warning("No categorical columns available, please re-upload the data with categorical columns")
-                else:
-                    x_axis = st.selectbox(
-                        "X-axis", 
-                        categorical_cols,
-                        index=None,
-                        placeholder= "Select x-axis (categorical columns)",
-                        key="bar_x_axis"
-                    )
-                    y_axis = st.selectbox(
-                        "Y-axis", 
-                        numeric_cols,
-                        index=None,
-                        placeholder="Select y-axis (numeric columns)",  
-                        key="bar_y_axis"
-                    )
-
-                    if st.button("Display", key="display_bar_chart", use_container_width=True):
-                        if x_axis is None:
-                            st.error("X-axis must not be empty.")
-                        elif y_axis is None:
-                            st.error("Y-axis must not be empty.")
-                        else:
-                            show_bar_graph(df, x_axis, y_axis, selected_file_name, selected_sheet_name)
-            elif selected_display_data == "Pie Chart":
-                # TODO : ini mesti di buat function juga
-                # Filter column if every data in a column is NaN / None
-                pie_cols = [col for col in df.columns if not df[col].isna().all()]
-                pie_col = st.selectbox(
-                    "Pie Chart Column",
-                    pie_cols,
-                    index=None,
-                    placeholder="Select a column for pie chart",
-                    key="pie_chart_col"
-                )
-                if st.button("Display", key="display_pie_chart", use_container_width=True):
-                    if pie_col is None:
-                        st.error("Please select a column for the pie chart.")
-                    else:
-                        show_pie_chart(df, pie_col, selected_file_name=selected_file_name, selected_sheet_name=selected_sheet_name)
-            elif selected_display_data == "Scatter Plot":
-                # Filter column if every data in a column is NaN / None
-                numeric_cols = [column for column in df.select_dtypes(include="number").columns if not df[column].isna().all()]
-                categorical_cols = [column for column in df.select_dtypes(exclude="number").columns if not df[column].isna().all()]
-                if len(numeric_cols) == 0:
-                    st.warning("No numerical columns available, please re-upload the data with numeric columns")
-                elif len(categorical_cols) == 0:
-                    st.warning("No categorical columns available, please re-upload the data with categorical columns")
-                else:                    
-                    x_axis = st.selectbox(
-                        "X-axis",
-                        numeric_cols,
-                        index=None,
-                        placeholder="Select X-axis (numeric column)",
-                        key="scatter_x_axis"
-                    )
-
-                    y_axis = st.selectbox(
-                        "Y-axis",
-                        categorical_cols,
-                        index=None,
-                        placeholder="Select Y-axis (numeric column)",
-                        key="scatter_y_axis"
-                    )
-
-                    if st.button("Display", key="display_scatter_plot", use_container_width=True):
-                        if x_axis is None:
-                            st.error("X-axis must not be empty.")
-                        elif y_axis is None:
-                            st.error("Y-axis must not be empty.")
-                        else:
-                            show_scatter_plot(df, x_axis, y_axis, selected_file_name, selected_sheet_name)
+        display_chart(df, selected_file_name, selected_sheet_name)
 
 def generate_insight_from_openai(user_input, df):
     csv_data = df.to_csv(index=False)
