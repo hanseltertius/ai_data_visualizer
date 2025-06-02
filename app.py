@@ -1,9 +1,9 @@
 import pandas as pd
 import streamlit as st
-import matplotlib.pyplot as plt
 import openai
-import io
-import base64
+
+from classes.charthandler import ChartHandler
+from classes.datahandler import DataHandler
 
 # region Initialize API key
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
@@ -11,20 +11,24 @@ openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # region Variables
 ALLOWED_FILE_TYPES = ["csv", "xlsx", "xls", "xlsm"]
+data_handler = DataHandler()
 # endregion
 
 # region State Initialization
-if "uploaded_file" not in st.session_state:
-    st.session_state.uploaded_file = None
+def initialize_session_state():
+    defaults = {
+        "uploaded_file": None,
+        "generated_insight": None,
+        "display_summarized_columns": False,
+        "last_selected_columns": []
+    }
 
-if "generated_insight" not in st.session_state:
-    st.session_state.generated_insight = None
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
 
-if "display_summarized_columns" not in st.session_state:
-    st.session_state.display_summarized_columns = False
-
-if "last_selected_columns" not in st.session_state:
-    st.session_state.last_selected_columns = []
+# Call this function at the top of your script
+initialize_session_state()
 # endregion
 
 # region Functions
@@ -53,55 +57,25 @@ def format_column_value(value):
 @st.dialog("Bar Graph Result", width="large")
 def show_bar_graph(df, x_axis, y_axis, selected_file_name, selected_sheet_name = ""):
     # region Setup Bar Graph
-    chart_title = f"Summary of {selected_file_name} in {selected_sheet_name}" if selected_sheet_name else f"Summary of {selected_file_name}"
-    num_x = len(df[x_axis].unique())
-    fig_width = min(max(8, num_x * 0.5), 40) # Dynamically set width: 0.5 inch per x label, min 8, max 40
-    
-    # Generate color list using colormap
-    colormap = plt.cm.get_cmap('tab10', num_x)
-    colors = [colormap(i) for i in range(num_x)]
-
-    figure, axes = plt.subplots(figsize=(fig_width, 6))
-    axes.bar(
-        df[x_axis].astype(str), 
-        df[y_axis],
-        color=colors
-    )
-    axes.set_xlabel(x_axis)
-    axes.set_ylabel(y_axis)
-    axes.set_title(chart_title)
-    plt.xticks(rotation=45, ha="center")
-    plt.yticks(rotation=315, va="center")
-    plt.tight_layout()
+    chart_handler = ChartHandler()
+    figure = chart_handler.generate_bar_chart(df, x_axis, y_axis, selected_file_name, selected_sheet_name)
     # endregion
 
     # region Generate Image
-    buf = io.BytesIO()
-    figure.savefig(buf, format="png", bbox_inches="tight")
-    buf.seek(0)
+    buffer = chart_handler.get_buffer_image(figure)
+    
+    num_x = len(df[x_axis].unique())
+    fig_width = min(max(8, num_x * 0.5), 40) # Dynamically set width: 0.5 inch per x label, min 8, max 40
 
-    # Display image in a scrollable div
-    dpi = 100  # Default matplotlib DPI
-    img_width_px = int(fig_width * dpi)
-    img_height_px = int(6 * dpi)
+    image_html = chart_handler.generate_image(buffer, fig_width, 6)
 
-    img_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
-    st.markdown(
-        f"""
-        <div style="overflow-x: auto; overflow-y: auto; width: 100%; max-height: 800px; padding-bottom: 8px; margin-bottom: 8px">
-            <img 
-                style="display: block; min-width: {img_width_px}px; min-height: {img_height_px}px; width: auto; height: auto;" 
-                src="data:image/png;base64,{img_base64}" />
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    st.markdown(image_html, unsafe_allow_html=True)
     # endregion
 
     # region Download Button
     st.download_button(
         "Download as PNG",
-        data=buf,
+        data=buffer,
         file_name="bar_chart.png",
         mime="image/png",
         use_container_width=True
@@ -111,39 +85,20 @@ def show_bar_graph(df, x_axis, y_axis, selected_file_name, selected_sheet_name =
 @st.dialog("Pie Chart Result", width="large")
 def show_pie_chart(df, column, selected_file_name, selected_sheet_name = ""):
     # region Setup Pie Chart
-    chart_title = f"Pie Chart of {column} in {selected_file_name}" if not selected_sheet_name else f"Pie Chart of {column} in {selected_file_name} ({selected_sheet_name})"
-    value_counts = df[column].value_counts(dropna=False)
-    figure, axes = plt.subplots(figsize=(8, 8))
-    axes.pie(value_counts, labels=value_counts.index.astype(str), autopct='%1.1f%%', startangle=90)
-    axes.set_title(chart_title)
-    plt.tight_layout()
+    chart_handler = ChartHandler()
+    figure = chart_handler.generate_pie_chart(df, column, selected_file_name, selected_sheet_name)
     # endregion
 
     # region Generate Image
-    buf = io.BytesIO()
-    figure.savefig(buf, format="png", bbox_inches="tight")
-    buf.seek(0)
-
-    dpi = 100
-    img_width_px = int(8 * dpi)
-    img_height_px = int(8 * dpi)
-    img_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
-    st.markdown(
-        f"""
-        <div style="overflow-x: auto; overflow-y: auto; width: 100%; max-height: 800px; margin-bottom: 8px">
-            <img 
-                style="display: block; min-width: {img_width_px}px; min-height: {img_height_px}px; width: auto; height: auto;" 
-                src="data:image/png;base64,{img_base64}" />
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    buffer = chart_handler.get_buffer_image(figure)
+    image_html = chart_handler.generate_image(buffer, 8, 8)
+    st.markdown(image_html, unsafe_allow_html=True)
     # endregion
 
     # region Download Button
     st.download_button(
         "Download as PNG",
-        data=buf,
+        data=buffer,
         file_name="pie_chart.png",
         mime="image/png",
         use_container_width=True
@@ -153,44 +108,21 @@ def show_pie_chart(df, column, selected_file_name, selected_sheet_name = ""):
 @st.dialog("Scatter Plot Result", width="large")
 def show_scatter_plot(df, x_axis, y_axis, selected_file_name, selected_sheet_name=""):
     # region Setup Scatter Plot
-    chart_title = f"Scatter Plot of {y_axis} vs {x_axis} in {selected_file_name}" if not selected_sheet_name else f"Scatter Plot of {y_axis} vs {x_axis} in {selected_file_name} ({selected_sheet_name})"
-    figure, axes = plt.subplots(figsize=(8, 6))
-    axes.scatter(
-        df[x_axis], df[y_axis], 
-        c=df[y_axis], cmap="viridis", alpha=0.7)
-    axes.set_xlabel(x_axis)
-    axes.set_ylabel(y_axis)
-    axes.set_title(chart_title)
-    plt.xticks(rotation=45, ha="center")
-    plt.yticks(rotation=315, va="center")
-    plt.tight_layout()
+    chart_handler = ChartHandler()
+    figure = chart_handler.generate_scatter_plot(df, x_axis, y_axis, selected_file_name, selected_sheet_name)
     # endregion
 
     # region Generate Image
-    buf = io.BytesIO()
-    figure.savefig(buf, format="png", bbox_inches="tight")
-    buf.seek(0)
-    dpi = 100
-    img_width_px = int(8 * dpi)
-    img_height_px = int(6 * dpi)
-    img_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
-    st.markdown(
-        f"""
-        <div style="overflow-x: auto; overflow-y: auto; width: 100%; max-height: 800px; padding-bottom: 8px; margin-bottom: 8px">
-            <img 
-                style="display: block; min-width: {img_width_px}px; min-height: {img_height_px}px; width: auto; height: auto;" 
-                src="data:image/png;base64,{img_base64}" />
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    buffer = chart_handler.get_buffer_image(figure)
+    image_html = chart_handler.generate_image(buffer, 8, 6)
+    st.markdown(image_html, unsafe_allow_html=True)
     # endregion
 
     # region Download Button
     st.download_button(
         "Download as PNG",
-        data=buf,
-        file_name="bar_chart.png",
+        data=buffer,
+        file_name="scatter_plot.png",
         mime="image/png",
         use_container_width=True
     )
@@ -205,8 +137,9 @@ def display_dataframe(uploaded_file = None, selected_sheet_name = "", selected_f
             if is_empty_columns(df):
                 st.error("The selected Excel sheet has no columns or data.")
                 return
-            st.dataframe(df)
-            display_tabs(df, selected_sheet_name=selected_sheet_name, selected_file_name=selected_file_name)
+            data_handler.df = df
+            st.dataframe(data_handler.df)
+            display_tabs(data_handler.df, selected_sheet_name=selected_sheet_name, selected_file_name=selected_file_name)
         except Exception as e:
             st.error(f"Failed to read the Excel file or sheet: {e}")
         # endregion
@@ -223,8 +156,9 @@ def display_dataframe(uploaded_file = None, selected_sheet_name = "", selected_f
             if is_empty_columns(df):
                 st.error("The uploaded CSV file has no columns or data.")
                 return
-            st.dataframe(df)
-            display_tabs(df, selected_sheet_name=selected_sheet_name, selected_file_name=selected_file_name)
+            data_handler.df = df
+            st.dataframe(data_handler.df)
+            display_tabs(data_handler.df, selected_sheet_name=selected_sheet_name, selected_file_name=selected_file_name)
         except pd.errors.EmptyDataError:
             st.error("The uploaded CSV file is empty or invalid.")
         # endregion
@@ -259,8 +193,8 @@ def display_insight(df):
 
 def display_bar_chart(df, selected_file_name, selected_sheet_name=""):
     # Filter column if every data in a column is NaN / None
-    numeric_cols = [column for column in df.select_dtypes(include="number").columns if not df[column].isna().all()]
-    categorical_cols = [column for column in df.select_dtypes(exclude="number").columns if not df[column].isna().all()]
+    numeric_cols = data_handler.get_numeric_columns(df=df)
+    categorical_cols = data_handler.get_categorical_columns(df=df)
     if len(numeric_cols) == 0:
         st.warning("No numerical columns available, please re-upload the data with numeric columns")
     elif len(categorical_cols) == 0:
@@ -287,15 +221,12 @@ def display_bar_chart(df, selected_file_name, selected_sheet_name=""):
             elif y_axis is None:
                 st.error("Y-axis must not be empty.")
             else:
-                plot_df = df.dropna(subset=[x_axis, y_axis])    # Drop rows with NaN in x or y axis
-                # Calculate and display average y for each x
-                avg_df = plot_df.groupby(x_axis, dropna=False)[y_axis].mean().reset_index()
-                avg_df.columns = [x_axis, y_axis]
+                avg_df = data_handler.get_clean_df(columns=[x_axis, y_axis], df=df, is_get_average=True)
                 show_bar_graph(avg_df, x_axis, y_axis, selected_file_name, selected_sheet_name)
 
 def display_pie_chart(df, selected_file_name, selected_sheet_name=""):
     # Filter column if every data in a column is NaN / None
-    pie_cols = [col for col in df.columns if not df[col].isna().all()]
+    pie_cols = data_handler.get_all_columns(df=df)
     if len(pie_cols) == 0:
         st.warning("No columns available, please re-upload the data with valid columns")
     else:
@@ -313,7 +244,7 @@ def display_pie_chart(df, selected_file_name, selected_sheet_name=""):
                 show_pie_chart(df, pie_col, selected_file_name=selected_file_name, selected_sheet_name=selected_sheet_name)
 
 def display_scatter_plot(df, selected_file_name, selected_sheet_name=""):
-    numeric_cols = [column for column in df.select_dtypes(include="number").columns if not df[column].isna().all()]
+    numeric_cols = data_handler.get_numeric_columns(df=df)
     if len(numeric_cols) < 2:
         st.warning("At least two numerical columns are required to display a scatter plot. Please re-upload the data with more numeric columns.")
     else:                    
@@ -344,7 +275,7 @@ def display_scatter_plot(df, selected_file_name, selected_sheet_name=""):
             elif y_axis is None:
                 st.error("Y-axis must not be empty.")
             else:
-                plot_df = df.dropna(subset=[x_axis, y_axis])
+                plot_df = data_handler.get_clean_df(columns=[x_axis, y_axis], df=df)
                 show_scatter_plot(plot_df, x_axis, y_axis, selected_file_name, selected_sheet_name)
 
 def display_chart(df, selected_file_name, selected_sheet_name = ""):
@@ -648,19 +579,19 @@ def display_tabs(df, selected_sheet_name = "", selected_file_name = ""):
     tab_summary, tab_insight, tab_chart = st.tabs(["Summary", "Insight", "Chart"])
 
     # Remove unnamed columns
-    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+    df_without_unnamed_columns = data_handler.remove_unnamed_columns(df=df)
 
     with tab_summary:
         overall_summary, summary_by_columns = st.tabs(["Overall", "Summary by Column(s)"])
 
         with overall_summary:
-            display_overall_summary(df)
+            display_overall_summary(df_without_unnamed_columns)
         with summary_by_columns:
-            display_summary_by_columns(df)
+            display_summary_by_columns(df_without_unnamed_columns)
     with tab_insight:
-        display_insight(df)
+        display_insight(df_without_unnamed_columns)
     with tab_chart:
-        display_chart(df, selected_file_name, selected_sheet_name)
+        display_chart(df_without_unnamed_columns, selected_file_name, selected_sheet_name)
 
 def generate_insight_from_openai(insight_input, df):
     csv_data = df.to_csv(index=False)
