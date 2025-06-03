@@ -76,13 +76,7 @@ def show_bar_graph(df, x_axis, y_axis, selected_file_name, selected_sheet_name =
     # endregion
 
     # region Download Button
-    st.download_button(
-        "Download as PNG",
-        data=buffer,
-        file_name="bar_chart.png",
-        mime="image/png",
-        use_container_width=True
-    )
+    generate_download_png_button(buffer, "bar_chart.png")
     # endregion
 
 @st.dialog("Pie Chart Result", width="large")
@@ -99,13 +93,7 @@ def show_pie_chart(df, column, selected_file_name, selected_sheet_name = ""):
     # endregion
 
     # region Download Button
-    st.download_button(
-        "Download as PNG",
-        data=buffer,
-        file_name="pie_chart.png",
-        mime="image/png",
-        use_container_width=True
-    )
+    generate_download_png_button(buffer, "pie_chart.png")
     # endregion
 
 @st.dialog("Scatter Plot Result", width="large")
@@ -122,13 +110,7 @@ def show_scatter_plot(df, x_axis, y_axis, selected_file_name, selected_sheet_nam
     # endregion
 
     # region Download Button
-    st.download_button(
-        "Download as PNG",
-        data=buffer,
-        file_name="scatter_plot.png",
-        mime="image/png",
-        use_container_width=True
-    )
+    generate_download_png_button(buffer, "scatter_plot.png")
     # endregion
 
 def display_dataframe(uploaded_file = None, selected_sheet_name = "", selected_file_name = "", is_excel=True):
@@ -595,6 +577,15 @@ def display_tabs(df, selected_sheet_name = "", selected_file_name = ""):
         display_insight(df_without_unnamed_columns)
     with tab_chart:
         display_chart(df_without_unnamed_columns, selected_file_name, selected_sheet_name)
+
+def generate_download_png_button(buffer, file_name = ""):
+    st.download_button(
+        "Download as PNG",
+        data=buffer,
+        file_name=file_name,
+        mime="image/png",
+        use_container_width=True
+    )
 
 def generate_insight_from_openai(insight_input, df):
     # Generate Summary to handle large datasets
