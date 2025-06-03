@@ -211,10 +211,10 @@ def display_bar_chart(df, selected_file_name, selected_sheet_name=""):
             key="bar_x_axis"
         )
         y_axis = st.selectbox(
-            "Y-axis", 
+            "Average Y-axis", 
             numeric_cols,
             index=None,
-            placeholder="Select y-axis (numeric columns)",  
+            placeholder="Select average y-axis value (numeric columns)",  
             key="bar_y_axis"
         )
 
@@ -259,7 +259,7 @@ def display_scatter_plot(df, selected_file_name, selected_sheet_name=""):
             key="scatter_x_axis"
         )
 
-        # Only show Y-axis selectbox if X-axis is selected
+        # Only show Y-axis select box if X-axis is selected
         if x_axis is not None:
             y_axis_options = [col for col in numeric_cols if col != x_axis]
             y_axis = st.selectbox(
