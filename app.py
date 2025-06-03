@@ -1,6 +1,8 @@
 import pandas as pd
 import streamlit as st
 import openai
+import time
+import requests
 
 from classes.barchart import BarChart
 from classes.piechart import PieChart
@@ -128,6 +130,48 @@ def show_scatter_plot(df, x_axis, y_axis, selected_file_name, selected_sheet_nam
     generate_download_png_button(buffer, "scatter_plot.png")
     # endregion
 
+@st.dialog("Summarized Insight", width="large")
+def show_summary_dialog(text):
+    try:
+        summary_key = f"summarized_{hash(text)}"
+        if summary_key not in st.session_state:
+            # region Generate stream for the first time
+            try:
+                # region Generate Summary
+                with st.spinner("Summarizing with facebook/bart-large-cnn..."):
+                    summary = generate_summary_with_huggingface(text)
+                st.session_state[summary_key] = summary
+                # endregion
+
+                # region Simulate stream
+                placeholder = st.empty()
+                displayed = ""
+                for char in summary:
+                    displayed += char
+                    placeholder.markdown(displayed + "▌")
+                    time.sleep(0.01)
+                placeholder.markdown(displayed)
+                # endregion
+            except Exception as e:
+                st.error(f"Failed to summarize insight: {e}")
+                return
+            # endregion
+        else:
+            # region Display summary on re-run (when download button pressed)
+            summary = st.session_state[summary_key]
+            st.markdown(summary)
+            # endregion
+
+        st.download_button(
+            label="Download Summary",
+            data=summary,
+            file_name="summarized_insight.txt",
+            mime="text/plain",
+            use_container_width=True
+        )
+    except Exception as e:
+        st.error(f"Failed to summarize insight: {e}")
+
 def display_dataframe(uploaded_file = None, selected_sheet_name = "", selected_file_name = "", is_excel=True):
     if is_excel:
         # region Display DataFrame from Excel
@@ -201,6 +245,8 @@ def display_insight(df):
                     mime="text/plain",
                     use_container_width=True
                 )
+                if st.button("Summarize Insight", use_container_width=True):
+                    show_summary_dialog(st.session_state.generated_insight)
 
 def display_bar_chart(df, selected_file_name, selected_sheet_name=""):
     # Filter column if every data in a column is NaN / None
