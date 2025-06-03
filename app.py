@@ -13,6 +13,7 @@ openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # region Variables
 ALLOWED_FILE_TYPES = ["csv", "xlsx", "xls", "xlsm"]
+OPEN_AI_MODEL = "gpt-4o"
 data_handler = DataHandler()
 # endregion
 
@@ -22,7 +23,10 @@ def initialize_session_state():
         "uploaded_file": None,
         "generated_insight": None,
         "display_summarized_columns": False,
-        "last_selected_columns": []
+        "last_selected_columns": [],
+        "insight_generating": False,
+        "insight_input_to_generate": None,
+        "insight_df_to_generate": None,
     }
 
     for key, value in defaults.items():
@@ -56,6 +60,17 @@ def format_column_value(value):
     if isinstance(value, float):
         return f"{value:.2f}"
     return str(value)
+
+def generate_summary_with_huggingface(text):
+    api_url = "https://api-inference.huggingface.co/models/facebook/bart-large-cnn"
+    headers = {"Authorization": f"Bearer {st.secrets.get("HUGGINGFACE_API_KEY")}"}
+    payload = {"inputs": text}
+    response = requests.post(api_url, headers=headers, json=payload)
+    if response.status_code == 200:
+        summary = response.json()[0]['summary_text']
+        return summary
+    else:
+        raise Exception(f"HuggingFace API Error: {response.text}")
 
 @st.dialog("Bar Graph Result", width="large")
 def show_bar_graph(df, x_axis, y_axis, selected_file_name, selected_sheet_name = ""):
@@ -152,6 +167,7 @@ def display_insight(df):
     if is_empty_columns(df):
         st.warning("There are no columns to generate insight with. Please upload a valid file with data.")
     else:
+        st.markdown(f"Insight generation powered by ```{OPEN_AI_MODEL}``` via OpenAI 🤖")
         insight_input = st.text_area(
             label="Insight",
             key="insight_input", 
@@ -162,19 +178,29 @@ def display_insight(df):
         if st.button("Generate Insight", use_container_width=True):
             reformatted_insight_input = insight_input.strip()
             if reformatted_insight_input:
-                generate_insight_from_openai(reformatted_insight_input, df)
+                st.session_state.generated_insight = None
+                st.session_state.insight_generating = True
+                st.session_state.insight_input_to_generate = reformatted_insight_input
+                st.session_state.insight_df_to_generate = df
+                st.rerun()
             else:
                 st.error("Insight input cannot be empty.")
 
-        if st.session_state.get("generated_insight"):
-            st.markdown(st.session_state.generated_insight)
-            st.download_button(
-                label="Download Insight",
-                data=st.session_state.generated_insight,
-                file_name="generated_insight.txt",
-                mime="text/plain",
-                use_container_width=True
-            )
+        # If generating, run the insight generation and reset flag
+        if st.session_state.get("insight_generating", False):
+            generate_insight_from_openai(st.session_state.get("insight_input_to_generate"), st.session_state.get("insight_df_to_generate"))
+
+        # Only show results if not generating and insight exists
+        if st.session_state.get("generated_insight") and not st.session_state.get("insight_generating", False):
+            with st.container():
+                st.markdown(st.session_state.generated_insight)
+                st.download_button(
+                    label="Download Insight",
+                    data=st.session_state.generated_insight,
+                    file_name="generated_insight.txt",
+                    mime="text/plain",
+                    use_container_width=True
+                )
 
 def display_bar_chart(df, selected_file_name, selected_sheet_name=""):
     # Filter column if every data in a column is NaN / None
@@ -602,9 +628,10 @@ def generate_insight_from_openai(insight_input, df):
     with st.spinner("Generating insight..."):
         response_placeholder = st.empty()
         full_response = ""
+        error_occured = False
         try:
             stream = openai.chat.completions.create(
-                model="gpt-4o",
+                model=OPEN_AI_MODEL,
                 messages=[
                     {"role": "user", "content": prompt}
                 ],
@@ -620,10 +647,17 @@ def generate_insight_from_openai(insight_input, df):
             response_placeholder.empty()
             st.session_state.generated_insight = full_response
         except Exception as e:
+            error_occured = True
             st.error(f"""
             Failed to generate insight: 
             {e}         
             """)
+        finally:
+            st.session_state.insight_generating = False
+            st.session_state.insight_input_to_generate = None
+            st.session_state.insight_df_to_generate = None
+            if not error_occured:
+                st.rerun()
 # endregion
 
 # region UI
