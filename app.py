@@ -596,7 +596,8 @@ def display_tabs(df, selected_sheet_name = "", selected_file_name = ""):
         display_chart(df_without_unnamed_columns, selected_file_name, selected_sheet_name)
 
 def generate_insight_from_openai(insight_input, df):
-    csv_data = df.to_csv(index=False)
+    # Generate Summary to handle large datasets
+    csv_data = df.describe(include='all').to_csv()
     prompt = f"""
     Given the following data table and user question, provide a data insight or analysis.
     Data Table: 
