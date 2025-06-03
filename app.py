@@ -29,6 +29,7 @@ def initialize_session_state():
         "insight_generating": False,
         "insight_input_to_generate": None,
         "insight_df_to_generate": None,
+        "last_selected_section": None,
     }
 
     for key, value in defaults.items():
@@ -183,7 +184,7 @@ def display_dataframe(uploaded_file = None, selected_sheet_name = "", selected_f
                 return
             data_handler.df = df
             st.dataframe(data_handler.df)
-            display_tabs(data_handler.df, selected_sheet_name=selected_sheet_name, selected_file_name=selected_file_name)
+            display_segmented_control(data_handler.df, selected_sheet_name=selected_sheet_name, selected_file_name=selected_file_name)
         except Exception as e:
             st.error(f"Failed to read the Excel file or sheet: {e}")
         # endregion
@@ -202,7 +203,7 @@ def display_dataframe(uploaded_file = None, selected_sheet_name = "", selected_f
                 return
             data_handler.df = df
             st.dataframe(data_handler.df)
-            display_tabs(data_handler.df, selected_sheet_name=selected_sheet_name, selected_file_name=selected_file_name)
+            display_segmented_control(data_handler.df, selected_sheet_name=selected_sheet_name, selected_file_name=selected_file_name)
         except pd.errors.EmptyDataError:
             st.error("The uploaded CSV file is empty or invalid.")
         # endregion
@@ -632,22 +633,32 @@ def display_summary_by_columns(df):
             st.error("Please select at least 1 column to summarize.")
     # endregion
 
-def display_tabs(df, selected_sheet_name = "", selected_file_name = ""):
-    tab_summary, tab_insight, tab_chart = st.tabs(["Summary", "Insight", "Chart"])
-
+def display_segmented_control(df, selected_sheet_name = "", selected_file_name = ""):
     # Remove unnamed columns
     df_without_unnamed_columns = data_handler.remove_unnamed_columns(df=df)
 
-    with tab_summary:
+    selected_section = st.segmented_control(
+        "Select View",
+        options=["Summary", "Insight", "Chart"],
+        key="main_segmented_control"
+    )
+
+    # Only clear when switching to Insight
+    if selected_section == "Insight" and st.session_state.last_selected_section != "Insight":
+        st.session_state.generated_insight = None
+
+    st.session_state.last_selected_section = selected_section
+
+    if selected_section == "Summary":
         overall_summary, summary_by_columns = st.tabs(["Overall", "Summary by Column(s)"])
 
         with overall_summary:
             display_overall_summary(df_without_unnamed_columns)
         with summary_by_columns:
             display_summary_by_columns(df_without_unnamed_columns)
-    with tab_insight:
+    elif selected_section == "Insight":
         display_insight(df_without_unnamed_columns)
-    with tab_chart:
+    elif selected_section == "Chart":
         display_chart(df_without_unnamed_columns, selected_file_name, selected_sheet_name)
 
 def generate_download_png_button(buffer, file_name = ""):
