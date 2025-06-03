@@ -2,7 +2,9 @@ import pandas as pd
 import streamlit as st
 import openai
 
-from classes.charthandler import ChartHandler
+from classes.barchart import BarChart
+from classes.piechart import PieChart
+from classes.scatterplot import ScatterPlot
 from classes.datahandler import DataHandler
 
 # region Initialize API key
@@ -57,17 +59,17 @@ def format_column_value(value):
 @st.dialog("Bar Graph Result", width="large")
 def show_bar_graph(df, x_axis, y_axis, selected_file_name, selected_sheet_name = ""):
     # region Setup Bar Graph
-    chart_handler = ChartHandler()
-    figure = chart_handler.generate_bar_chart(df, x_axis, y_axis, selected_file_name, selected_sheet_name)
+    bar_chart = BarChart()
+    figure = bar_chart.generate(df, x_axis, y_axis, selected_file_name, selected_sheet_name)
     # endregion
 
     # region Generate Image
-    buffer = chart_handler.get_buffer_image(figure)
+    buffer = bar_chart.get_buffer_image(figure)
     
     num_x = len(df[x_axis].unique())
     fig_width = min(max(8, num_x * 0.5), 40) # Dynamically set width: 0.5 inch per x label, min 8, max 40
 
-    image_html = chart_handler.generate_image(buffer, fig_width, 6)
+    image_html = bar_chart.generate_image(buffer, fig_width, 6)
 
     st.markdown(image_html, unsafe_allow_html=True)
     # endregion
@@ -85,13 +87,13 @@ def show_bar_graph(df, x_axis, y_axis, selected_file_name, selected_sheet_name =
 @st.dialog("Pie Chart Result", width="large")
 def show_pie_chart(df, column, selected_file_name, selected_sheet_name = ""):
     # region Setup Pie Chart
-    chart_handler = ChartHandler()
-    figure = chart_handler.generate_pie_chart(df, column, selected_file_name, selected_sheet_name)
+    pie_chart = PieChart()
+    figure = pie_chart.generate(df, column, selected_file_name, selected_sheet_name)
     # endregion
 
     # region Generate Image
-    buffer = chart_handler.get_buffer_image(figure)
-    image_html = chart_handler.generate_image(buffer, 8, 8)
+    buffer = pie_chart.get_buffer_image(figure)
+    image_html = pie_chart.generate_image(buffer, 8, 8)
     st.markdown(image_html, unsafe_allow_html=True)
     # endregion
 
@@ -108,13 +110,13 @@ def show_pie_chart(df, column, selected_file_name, selected_sheet_name = ""):
 @st.dialog("Scatter Plot Result", width="large")
 def show_scatter_plot(df, x_axis, y_axis, selected_file_name, selected_sheet_name=""):
     # region Setup Scatter Plot
-    chart_handler = ChartHandler()
-    figure = chart_handler.generate_scatter_plot(df, x_axis, y_axis, selected_file_name, selected_sheet_name)
+    scatter_plot = ScatterPlot()
+    figure = scatter_plot.generate(df, x_axis, y_axis, selected_file_name, selected_sheet_name)
     # endregion
 
     # region Generate Image
-    buffer = chart_handler.get_buffer_image(figure)
-    image_html = chart_handler.generate_image(buffer, 8, 6)
+    buffer = scatter_plot.get_buffer_image(figure)
+    image_html = scatter_plot.generate_image(buffer, 8, 6)
     st.markdown(image_html, unsafe_allow_html=True)
     # endregion
 
