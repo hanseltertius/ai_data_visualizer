@@ -674,7 +674,7 @@ def generate_insight_from_openai(insight_input, df):
     with st.spinner("Generating insight..."):
         response_placeholder = st.empty()
         full_response = ""
-        error_occured = False
+        error_occurred = False
         try:
             stream = openai.chat.completions.create(
                 model=OPEN_AI_MODEL,
@@ -693,7 +693,7 @@ def generate_insight_from_openai(insight_input, df):
             response_placeholder.empty()
             st.session_state.generated_insight = full_response
         except Exception as e:
-            error_occured = True
+            error_occurred = True
             st.error(f"""
             Failed to generate insight: 
             {e}         
@@ -702,7 +702,7 @@ def generate_insight_from_openai(insight_input, df):
             st.session_state.insight_generating = False
             st.session_state.insight_input_to_generate = None
             st.session_state.insight_df_to_generate = None
-            if not error_occured:
+            if not error_occurred:
                 st.rerun()
 # endregion
 
