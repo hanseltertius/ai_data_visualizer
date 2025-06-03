@@ -238,6 +238,7 @@ def display_insight(df):
         # Only show results if not generating and insight exists
         if st.session_state.get("generated_insight") and not st.session_state.get("insight_generating", False):
             with st.container():
+                st.markdown("#### Generated Insight")
                 st.markdown(st.session_state.generated_insight)
                 st.download_button(
                     label="Download Insight",
@@ -687,6 +688,7 @@ def generate_insight_from_openai(insight_input, df):
         full_response = ""
         error_occurred = False
         try:
+            # region Generate the response in the form of stream
             stream = openai.chat.completions.create(
                 model=OPEN_AI_MODEL,
                 messages=[
@@ -702,7 +704,21 @@ def generate_insight_from_openai(insight_input, df):
                         full_response += delta.content
                         response_placeholder.markdown(f"{full_response}▌")
             response_placeholder.empty()
+            # endregion
+
+            # region Generate Layout to ensure smooth transition between loading and loaded state
             st.session_state.generated_insight = full_response
+            st.markdown(full_response)
+            st.download_button(
+                label="Download Insight",
+                data=st.session_state.generated_insight,
+                file_name="generated_insight.txt",
+                mime="text/plain",
+                use_container_width=True
+            )
+            if st.button("Summarize Insight", use_container_width=True):
+                show_summary_dialog(st.session_state.generated_insight)
+            # endregion
         except Exception as e:
             error_occurred = True
             st.error(f"""
@@ -713,8 +729,12 @@ def generate_insight_from_openai(insight_input, df):
             st.session_state.insight_generating = False
             st.session_state.insight_input_to_generate = None
             st.session_state.insight_df_to_generate = None
-            if not error_occurred:
-                st.rerun()
+            
+    # region Re-run the application
+    if not error_occurred:
+        time.sleep(0.5)
+        st.rerun()
+    # endregion
 # endregion
 
 # region UI
