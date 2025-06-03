@@ -174,7 +174,7 @@ def display_insight(df):
             label="Insight",
             key="insight_input", 
             placeholder="Write your insight here... (Leading / Trailing whitespaces will be trimmed at the input generation)", 
-            label_visibility="hidden"
+            label_visibility="collapsed"
         )
 
         if st.button("Generate Insight", use_container_width=True):
