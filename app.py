@@ -50,6 +50,7 @@ def is_valid_uploaded_file(uploaded_file):
     
 def reset_uploaded_file():
     st.session_state.uploaded_file = None
+    st.session_state.generated_insight = None
 
 def format_column_value(value):
     if isinstance(value, float):
