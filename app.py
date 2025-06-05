@@ -30,6 +30,8 @@ def initialize_session_state():
         "insight_input_to_generate": None,
         "insight_df_to_generate": None,
         "last_selected_section": None,
+        "is_loading_data": False,
+        "insight_error_message": None,
     }
 
     for key, value in defaults.items():
@@ -41,6 +43,10 @@ initialize_session_state()
 # endregion
 
 # region Functions
+def set_loading_data(input):
+    if input:
+        st.session_state.is_loading_data = True
+
 def is_empty_columns(df):
     return df.empty or len(df.columns) == 0
 
@@ -58,6 +64,8 @@ def is_valid_uploaded_file(uploaded_file):
 def reset_uploaded_file():
     st.session_state.uploaded_file = None
     st.session_state.generated_insight = None
+    st.session_state.insight_error_message = None,
+    st.session_state.is_loading_data = False
 
 def format_column_value(value):
     if isinstance(value, float):
@@ -217,25 +225,33 @@ def display_insight(df):
             label="Insight",
             key="insight_input", 
             placeholder="Write your insight here... (Leading / Trailing whitespaces will be trimmed at the input generation)", 
-            label_visibility="collapsed"
+            label_visibility="collapsed",
+            disabled=st.session_state.get("is_loading_data")
         )
 
-        if st.button("Generate Insight", use_container_width=True):
-            reformatted_insight_input = insight_input.strip()
+        reformatted_insight_input = insight_input.strip()
+
+        if st.button(
+            "Generate Insight", 
+            disabled=st.session_state.get("is_loading_data"), 
+            on_click= set_loading_data(reformatted_insight_input), 
+            use_container_width=True):
             if reformatted_insight_input:
                 st.session_state.generated_insight = None
                 st.session_state.insight_generating = True
                 st.session_state.insight_input_to_generate = reformatted_insight_input
                 st.session_state.insight_df_to_generate = df
+                st.session_state.insight_error_message = None
                 st.rerun()
             else:
                 st.error("Insight input cannot be empty.")
 
-        # If generating, run the insight generation and reset flag
-        if st.session_state.get("insight_generating", False):
+        # region Generating Insight
+        if st.session_state.get("insight_generating"):
             generate_insight_from_openai(st.session_state.get("insight_input_to_generate"), st.session_state.get("insight_df_to_generate"))
+        # endregion
 
-        # Only show results if not generating and insight exists
+        # region Show Generated Insight
         if st.session_state.get("generated_insight") and not st.session_state.get("insight_generating", False):
             with st.container():
                 st.markdown("#### Generated Insight")
@@ -249,6 +265,12 @@ def display_insight(df):
                 )
                 if st.button("Summarize Insight", use_container_width=True):
                     show_summary_dialog(st.session_state.generated_insight)
+        # endregion
+
+        # region Show Error from Generating Insight
+        if st.session_state.get("insight_error_message"):
+            st.error(st.session_state.insight_error_message)
+        # endregion
 
 def display_bar_chart(df, selected_file_name, selected_sheet_name=""):
     # Filter column if every data in a column is NaN / None
@@ -641,12 +663,14 @@ def display_segmented_control(df, selected_sheet_name = "", selected_file_name =
     selected_section = st.segmented_control(
         "Select View",
         options=["Summary", "Insight", "Chart"],
-        key="main_segmented_control"
+        key="main_segmented_control",
+        disabled=st.session_state.get("is_loading_data")
     )
 
     # Only clear when switching to Insight
     if selected_section == "Insight" and st.session_state.last_selected_section != "Insight":
         st.session_state.generated_insight = None
+        st.session_state.insight_error_message = None
 
     st.session_state.last_selected_section = selected_section
 
@@ -686,7 +710,6 @@ def generate_insight_from_openai(insight_input, df):
     with st.spinner("Generating insight..."):
         response_placeholder = st.empty()
         full_response = ""
-        error_occurred = False
         try:
             # region Generate the response in the form of stream
             stream = openai.chat.completions.create(
@@ -720,21 +743,16 @@ def generate_insight_from_openai(insight_input, df):
                 show_summary_dialog(st.session_state.generated_insight)
             # endregion
         except Exception as e:
-            error_occurred = True
-            st.error(f"""
-            Failed to generate insight: 
-            {e}         
-            """)
+            st.session_state.insight_error_message = f"""
+                Failed to generate insight: {e}
+            """
         finally:
             st.session_state.insight_generating = False
             st.session_state.insight_input_to_generate = None
             st.session_state.insight_df_to_generate = None
-            
-    # region Re-run the application
-    if not error_occurred:
-        time.sleep(0.5)
-        st.rerun()
-    # endregion
+            st.session_state.is_loading_data = False
+            time.sleep(0.5)
+            st.rerun()
 # endregion
 
 # region UI
@@ -744,10 +762,11 @@ uploaded_file = st.file_uploader(
     "Upload your file here", 
     type=ALLOWED_FILE_TYPES, 
     key="file_uploader",
-    on_change=reset_uploaded_file
+    on_change=reset_uploaded_file,
+    disabled=st.session_state.get("is_loading_data")
 )
 
-if st.button("Upload File", use_container_width=True):
+if st.button("Upload File", use_container_width=True, disabled=st.session_state.get("is_loading_data")):
     valid_uploaded_file = is_valid_uploaded_file(uploaded_file)
 
     if valid_uploaded_file:
@@ -777,7 +796,8 @@ if st.session_state.uploaded_file is not None:
                         sheet_names,
                         index=None,
                         placeholder="Select a sheet to visualize",
-                        key="sheet_selector"
+                        key="sheet_selector",
+                        disabled=st.session_state.get("is_loading_data")
                     )
 
                     if selected_sheet is not None:
