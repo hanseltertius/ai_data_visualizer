@@ -2,6 +2,7 @@ import pandas as pd
 import streamlit as st
 import openai
 import requests
+import time
 
 from classes.barchart import BarChart
 from classes.piechart import PieChart
@@ -76,7 +77,7 @@ def generate_summary_with_huggingface(text):
     api_url = "https://api-inference.huggingface.co/models/facebook/bart-large-cnn"
     headers = {"Authorization": f"Bearer {st.secrets.get("HUGGINGFACE_API_KEY")}"}
     payload = {"inputs": text}
-    response = requests.post(api_url, headers=headers, json=payload)
+    response = requests.post(api_url, headers=headers, json=payload, timeout=60)
     if response.status_code == 200:
         summary = response.json()[0]['summary_text']
         return summary
@@ -143,6 +144,13 @@ def generate_summarized_insight(text):
     try:
         with st.spinner("Generating summarized insight..."):
             summary = generate_summary_with_huggingface(text)
+            response_placeholder = st.empty()
+            displayed = ""
+            for char in summary:
+                displayed += char
+                response_placeholder.markdown(displayed + "▌")
+                time.sleep(0.003)
+            response_placeholder.empty()
         st.session_state.summarized_insight = summary
     except Exception as e:
         st.session_state.summarized_insight_error_message = f"""
@@ -152,6 +160,7 @@ def generate_summarized_insight(text):
     finally:
         st.session_state.summary_generating = False
         st.session_state.is_loading_data = False
+        time.sleep(0.04)
         st.rerun()
 
 def display_dataframe(uploaded_file = None, selected_sheet_name = "", selected_file_name = "", is_excel=True):
@@ -753,6 +762,7 @@ def generate_insight_from_openai(insight_input, df):
             st.session_state.insight_input_to_generate = None
             st.session_state.insight_df_to_generate = None
             st.session_state.is_loading_data = False
+            time.sleep(0.04)
             st.rerun()
 # endregion
 
