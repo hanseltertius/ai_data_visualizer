@@ -1,7 +1,6 @@
 import pandas as pd
 import streamlit as st
 import openai
-import time
 import requests
 
 from classes.barchart import BarChart
@@ -32,6 +31,8 @@ def initialize_session_state():
         "last_selected_section": None,
         "is_loading_data": False,
         "insight_error_message": None,
+        "summarized_insight": None,
+        "summarized_insight_error_message": None
     }
 
     for key, value in defaults.items():
@@ -43,10 +44,6 @@ initialize_session_state()
 # endregion
 
 # region Functions
-def set_loading_data(input):
-    if input:
-        st.session_state.is_loading_data = True
-
 def is_empty_columns(df):
     return df.empty or len(df.columns) == 0
 
@@ -64,8 +61,10 @@ def is_valid_uploaded_file(uploaded_file):
 def reset_uploaded_file():
     st.session_state.uploaded_file = None
     st.session_state.generated_insight = None
-    st.session_state.insight_error_message = None,
+    st.session_state.insight_error_message = None
     st.session_state.is_loading_data = False
+    st.session_state.summarized_insight = None
+    st.session_state.summarized_insight_error_message = None
 
 def format_column_value(value):
     if isinstance(value, float):
@@ -139,47 +138,20 @@ def show_scatter_plot(df, x_axis, y_axis, selected_file_name, selected_sheet_nam
     generate_download_png_button(buffer, "scatter_plot.png")
     # endregion
 
-@st.dialog("Summarized Insight", width="large")
-def show_summary_dialog(text):
+def generate_summarized_insight(text):
     try:
-        summary_key = f"summarized_{hash(text)}"
-        if summary_key not in st.session_state:
-            # region Generate stream for the first time
-            try:
-                # region Generate Summary
-                with st.spinner("Summarizing with facebook/bart-large-cnn..."):
-                    summary = generate_summary_with_huggingface(text)
-                st.session_state[summary_key] = summary
-                # endregion
-
-                # region Simulate stream
-                placeholder = st.empty()
-                displayed = ""
-                for char in summary:
-                    displayed += char
-                    placeholder.markdown(displayed + "▌")
-                    time.sleep(0.01)
-                placeholder.markdown(displayed)
-                # endregion
-            except Exception as e:
-                st.error(f"Failed to summarize insight: {e}")
-                return
-            # endregion
-        else:
-            # region Display summary on re-run (when download button pressed)
-            summary = st.session_state[summary_key]
-            st.markdown(summary)
-            # endregion
-
-        st.download_button(
-            label="Download Summary",
-            data=summary,
-            file_name="summarized_insight.txt",
-            mime="text/plain",
-            use_container_width=True
-        )
+        with st.spinner("Generating summarized insight..."):
+            summary = generate_summary_with_huggingface(text)
+        st.session_state.summarized_insight = summary
     except Exception as e:
-        st.error(f"Failed to summarize insight: {e}")
+        st.session_state.summarized_insight_error_message = f"""
+            Failed to summarize insight: 
+            {e}
+        """
+    finally:
+        st.session_state.summary_generating = False
+        st.session_state.is_loading_data = False
+        st.rerun()
 
 def display_dataframe(uploaded_file = None, selected_sheet_name = "", selected_file_name = "", is_excel=True):
     if is_excel:
@@ -234,9 +206,9 @@ def display_insight(df):
         if st.button(
             "Generate Insight", 
             disabled=st.session_state.get("is_loading_data"), 
-            on_click= set_loading_data(reformatted_insight_input), 
             use_container_width=True):
             if reformatted_insight_input:
+                st.session_state.is_loading_data = True
                 st.session_state.generated_insight = None
                 st.session_state.insight_generating = True
                 st.session_state.insight_input_to_generate = reformatted_insight_input
@@ -251,8 +223,14 @@ def display_insight(df):
             generate_insight_from_openai(st.session_state.get("insight_input_to_generate"), st.session_state.get("insight_df_to_generate"))
         # endregion
 
+        # region Show Error from Generating Insight
+        if st.session_state.get("insight_error_message"):
+            st.error(st.session_state.insight_error_message)
+        # endregion
+
         # region Show Generated Insight
-        if st.session_state.get("generated_insight") and not st.session_state.get("insight_generating", False):
+        if st.session_state.get("generated_insight") and not st.session_state.get("insight_generating"):
+            # Container component to disappear the generated insight layout while loading
             with st.container():
                 st.markdown("#### Generated Insight")
                 st.markdown(st.session_state.generated_insight)
@@ -261,15 +239,42 @@ def display_insight(df):
                     data=st.session_state.generated_insight,
                     file_name="generated_insight.txt",
                     mime="text/plain",
-                    use_container_width=True
+                    use_container_width=True,
+                    key="generated_download_insight_btn",
+                    disabled=st.session_state.get("is_loading_data")
                 )
-                if st.button("Summarize Insight", use_container_width=True):
-                    show_summary_dialog(st.session_state.generated_insight)
-        # endregion
 
-        # region Show Error from Generating Insight
-        if st.session_state.get("insight_error_message"):
-            st.error(st.session_state.insight_error_message)
+                if st.button(
+                    "Summarize Insight", 
+                    use_container_width=True, 
+                    key="generated_summarized_insight_btn",
+                    disabled=st.session_state.get("is_loading_data")
+                ):
+                    st.session_state.is_loading_data = True
+                    st.session_state.summary_generating = True
+                    st.session_state.summarized_insight = None
+                    st.session_state.summarized_insight_error_message = None
+                    st.rerun()
+                    
+                if st.session_state.get("summary_generating"):
+                    generate_summarized_insight(st.session_state.generated_insight)
+
+                # Show summarized insight inline
+                if st.session_state.get("summarized_insight") and not st.session_state.get("summary_generating"):
+                    # Container component to disappear the summarized insight layout while loading
+                    with st.container():
+                        st.markdown("#### Summarized Insight")
+                        st.markdown(st.session_state.summarized_insight)
+                        st.download_button(
+                            label="Download Summary",
+                            data=st.session_state.summarized_insight,
+                            file_name="summarized_insight.txt",
+                            mime="text/plain",
+                            use_container_width=True
+                        )
+                
+                if st.session_state.get("summarized_insight_error_message"):
+                    st.error(st.session_state.summarized_insight_error_message)
         # endregion
 
 def display_bar_chart(df, selected_file_name, selected_sheet_name=""):
@@ -670,6 +675,7 @@ def display_segmented_control(df, selected_sheet_name = "", selected_file_name =
     # Only clear when switching to Insight
     if selected_section == "Insight" and st.session_state.last_selected_section != "Insight":
         st.session_state.generated_insight = None
+        st.session_state.summarized_insight = None
         st.session_state.insight_error_message = None
 
     st.session_state.last_selected_section = selected_section
@@ -729,29 +735,17 @@ def generate_insight_from_openai(insight_input, df):
             response_placeholder.empty()
             # endregion
 
-            # region Generate Layout to ensure smooth transition between loading and loaded state
             st.session_state.generated_insight = full_response
-            st.markdown(full_response)
-            st.download_button(
-                label="Download Insight",
-                data=st.session_state.generated_insight,
-                file_name="generated_insight.txt",
-                mime="text/plain",
-                use_container_width=True
-            )
-            if st.button("Summarize Insight", use_container_width=True):
-                show_summary_dialog(st.session_state.generated_insight)
-            # endregion
         except Exception as e:
             st.session_state.insight_error_message = f"""
-                Failed to generate insight: {e}
+                Failed to generate insight: 
+                {e}
             """
         finally:
             st.session_state.insight_generating = False
             st.session_state.insight_input_to_generate = None
             st.session_state.insight_df_to_generate = None
             st.session_state.is_loading_data = False
-            time.sleep(0.5)
             st.rerun()
 # endregion
 
