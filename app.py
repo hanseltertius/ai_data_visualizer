@@ -15,6 +15,7 @@ openai.api_key = st.secrets.get("OPENAI_API_KEY")
 # region Variables
 ALLOWED_FILE_TYPES = ["csv", "xlsx", "xls", "xlsm"]
 OPEN_AI_MODEL = "gpt-4o"
+HUGGING_FACE_AI_MODEL = "facebook/bart-large-cnn"
 data_handler = DataHandler()
 # endregion
 
@@ -192,7 +193,6 @@ def display_insight(df):
     if is_empty_columns(df):
         st.warning("There are no columns to generate insight with. Please upload a valid file with data.")
     else:
-        st.markdown(f"Insight generation powered by ```{OPEN_AI_MODEL}``` via OpenAI 🤖")
         insight_input = st.text_area(
             label="Insight",
             key="insight_input", 
@@ -233,6 +233,8 @@ def display_insight(df):
             # Container component to disappear the generated insight layout while loading
             with st.container():
                 st.markdown("#### Generated Insight")
+                st.markdown(f"Insight generation powered by ```{OPEN_AI_MODEL}``` via OpenAI 🤖")
+                st.markdown('<hr style="border: 1px solid #bbb; margin-top: 8px; margin-bottom: 8px;">', unsafe_allow_html=True)
                 st.markdown(st.session_state.generated_insight)
                 st.download_button(
                     label="Download Insight",
@@ -259,11 +261,13 @@ def display_insight(df):
                 if st.session_state.get("summary_generating"):
                     generate_summarized_insight(st.session_state.generated_insight)
 
-                # Show summarized insight inline
+                # region Show Summarized insight
                 if st.session_state.get("summarized_insight") and not st.session_state.get("summary_generating"):
                     # Container component to disappear the summarized insight layout while loading
                     with st.container():
                         st.markdown("#### Summarized Insight")
+                        st.markdown(f"Summary generation powered by `{HUGGING_FACE_AI_MODEL}` via HuggingFace Inference API 🤖")
+                        st.markdown('<hr style="border: 1px solid #bbb; margin-top: 8px; margin-bottom: 8px;">', unsafe_allow_html=True)
                         st.markdown(st.session_state.summarized_insight)
                         st.download_button(
                             label="Download Summary",
@@ -272,9 +276,12 @@ def display_insight(df):
                             mime="text/plain",
                             use_container_width=True
                         )
-                
+                # endregion
+
+                # region Show Error from Summarized insight
                 if st.session_state.get("summarized_insight_error_message"):
                     st.error(st.session_state.summarized_insight_error_message)
+                # endregion
         # endregion
 
 def display_bar_chart(df, selected_file_name, selected_sheet_name=""):
