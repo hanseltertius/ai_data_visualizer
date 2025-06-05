@@ -160,7 +160,7 @@ def generate_summarized_insight(text):
     finally:
         st.session_state.summary_generating = False
         st.session_state.is_loading_data = False
-        time.sleep(0.04)
+        time.sleep(0.08)
         st.rerun()
 
 def display_dataframe(uploaded_file = None, selected_sheet_name = "", selected_file_name = "", is_excel=True):
@@ -762,7 +762,7 @@ def generate_insight_from_openai(insight_input, df):
             st.session_state.insight_input_to_generate = None
             st.session_state.insight_df_to_generate = None
             st.session_state.is_loading_data = False
-            time.sleep(0.04)
+            time.sleep(0.08)
             st.rerun()
 # endregion
 
