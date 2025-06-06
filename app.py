@@ -690,7 +690,6 @@ def display_segmented_control(df, selected_sheet_name = "", selected_file_name =
         options=["Summary", "Insight", "Chart"],
         key="main_segmented_control",
         disabled=st.session_state.get("is_loading_data"),
-        default=options[0]
     )
 
     # Only clear when switching to Insight
