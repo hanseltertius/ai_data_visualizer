@@ -14,7 +14,7 @@ openai.api_key = st.secrets.get("OPENAI_API_KEY")
 # endregion
 
 # region Variables
-ALLOWED_FILE_TYPES = ["csv", "xlsx", "xls", "xlsm"]
+ALLOWED_FILE_TYPES = ["csv", "xlsx", "xls"]
 OPEN_AI_MODEL = "gpt-4o"
 HUGGING_FACE_AI_MODEL = "facebook/bart-large-cnn"
 data_handler = DataHandler()
@@ -805,7 +805,6 @@ if st.session_state.get("uploaded_file") is not None:
     if file_type in [
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "application/vnd.ms-excel",
-        "application/vnd.ms-excel.sheet.macroEnabled.12"
     ]:
         try:
             excel_file = pd.ExcelFile(uploaded_file)
