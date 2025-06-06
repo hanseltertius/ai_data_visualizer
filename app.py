@@ -36,7 +36,8 @@ def initialize_session_state():
         "summarized_insight": None,
         "summarized_insight_error_message": None,
         "main_segmented_control": None,
-        "latest_selected_sheet": None
+        "latest_selected_sheet": None,
+        "summary_selection_radio": None
     }
 
     for key, value in defaults.items():
@@ -70,6 +71,7 @@ def reset_uploaded_file():
     st.session_state.summarized_insight = None
     st.session_state.summarized_insight_error_message = None
     st.session_state.main_segmented_control = None
+    st.session_state.summary_selection_radio = None
 
 def format_column_value(value):
     if isinstance(value, float):
@@ -700,11 +702,21 @@ def display_segmented_control(selected_sheet_name = "", selected_file_name = "")
     st.session_state.latest_selected_section = selected_section
 
     if selected_section == "Summary":
-        overall_summary, summary_by_columns = st.tabs(["Overall", "Summary by Column(s)"])
+        tab_options = ["Overall", "Summary by Column(s)"]
+        if st.session_state.get("summary_selection_radio") is None:
+            st.session_state.summary_selection_radio = tab_options[0]
+        
+        selected_summary_by = st.radio(
+            "Select Summary by",
+            tab_options,
+            index=tab_options.index(st.session_state.summary_selection_radio),
+            horizontal=True,
+            key="summary_selection_radio"
+        )
 
-        with overall_summary:
+        if selected_summary_by == "Overall":
             display_overall_summary(df_without_unnamed_columns)
-        with summary_by_columns:
+        else:
             display_summary_by_columns(df_without_unnamed_columns)
     elif selected_section == "Insight":
         display_insight(df_without_unnamed_columns)
@@ -828,9 +840,7 @@ if st.session_state.get("uploaded_file") is not None:
 
                     # region Set Selected Segmented control to "Summary" when changing sheet
                     if st.session_state.get("latest_selected_sheet") != selected_sheet:
-                        # Only reset segmented control if the sheet actually changes
-                        if st.session_state.get("main_segmented_control") != "Summary":
-                            st.session_state.main_segmented_control = "Summary"
+                        st.session_state.main_segmented_control = "Summary"
                         st.session_state.latest_selected_sheet = selected_sheet
                     # endregion
 
