@@ -34,7 +34,9 @@ def initialize_session_state():
         "is_loading_data": False,
         "insight_error_message": None,
         "summarized_insight": None,
-        "summarized_insight_error_message": None
+        "summarized_insight_error_message": None,
+        "main_segmented_control": None,
+        "latest_selected_sheet": None
     }
 
     for key, value in defaults.items():
@@ -681,11 +683,14 @@ def display_segmented_control(df, selected_sheet_name = "", selected_file_name =
     # Remove unnamed columns
     df_without_unnamed_columns = data_handler.remove_unnamed_columns(df=df)
 
+    options = ["Summary", "Insight", "Chart"]
+
     selected_section = st.segmented_control(
         "Select View",
         options=["Summary", "Insight", "Chart"],
         key="main_segmented_control",
-        disabled=st.session_state.get("is_loading_data")
+        disabled=st.session_state.get("is_loading_data"),
+        default=options[0]
     )
 
     # Only clear when switching to Insight
@@ -810,6 +815,12 @@ if st.session_state.uploaded_file is not None:
                         key="sheet_selector",
                         disabled=st.session_state.get("is_loading_data")
                     )
+
+                    # region Set Selected Segmented control to "Summary" when changing sheet
+                    if st.session_state.latest_selected_sheet != selected_sheet:
+                        st.session_state.main_segmented_control = "Summary"
+                        st.session_state.latest_selected_sheet = selected_sheet
+                    # endregion
 
                     if selected_sheet is not None:
                         display_dataframe(selected_sheet_name=selected_sheet, selected_file_name=file_name)
