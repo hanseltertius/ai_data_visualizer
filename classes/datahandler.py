@@ -13,8 +13,10 @@ class DataHandler:
     def remove_unnamed_columns(self, df=None):
         df = df if df is not None else self._df
         if df is not None:
-            df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
-            return df
+            # Ensure all column names are strings to avoid errors with .str.contains
+            columns_as_str = df.columns.map(str)
+            mask = ~columns_as_str.str.contains('^Unnamed')
+            return df.loc[:, mask]
         return None
     
     def get_clean_df(self, columns, df=None, is_get_average=False):
