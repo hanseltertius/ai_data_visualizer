@@ -37,7 +37,7 @@ def initialize_session_state():
         "summarized_insight_error_message": None,
         "main_segmented_control": None,
         "latest_selected_sheet": None,
-        "summary_selection_radio": None
+        "summary_selection_radio": "Overall"
     }
 
     for key, value in defaults.items():
@@ -71,7 +71,7 @@ def reset_uploaded_file():
     st.session_state.summarized_insight = None
     st.session_state.summarized_insight_error_message = None
     st.session_state.main_segmented_control = None
-    st.session_state.summary_selection_radio = None
+    st.session_state.summary_selection_radio = "Overall"
 
 def format_column_value(value):
     if isinstance(value, float):
@@ -703,13 +703,9 @@ def display_segmented_control(selected_sheet_name = "", selected_file_name = "")
 
     if selected_section == "Summary":
         tab_options = ["Overall", "Summary by Column(s)"]
-        if st.session_state.get("summary_selection_radio") is None:
-            st.session_state.summary_selection_radio = tab_options[0]
-        
         selected_summary_by = st.radio(
             "Select Summary by",
             tab_options,
-            index=tab_options.index(st.session_state.summary_selection_radio),
             horizontal=True,
             key="summary_selection_radio"
         )
