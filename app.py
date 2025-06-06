@@ -26,11 +26,11 @@ def initialize_session_state():
         "uploaded_file": None,
         "generated_insight": None,
         "display_summarized_columns": False,
-        "last_selected_columns": [],
+        "latest_selected_columns": [],
         "insight_generating": False,
         "insight_input_to_generate": None,
         "insight_df_to_generate": None,
-        "last_selected_section": None,
+        "latest_selected_section": None,
         "is_loading_data": False,
         "insight_error_message": None,
         "summarized_insight": None,
@@ -85,6 +85,10 @@ def generate_summary_with_huggingface(text):
         return summary
     else:
         raise Exception(f"HuggingFace API Error: {response.text}")
+
+@st.cache_data
+def get_cleaned_df(df):
+    return data_handler.remove_unnamed_columns(df)
 
 @st.dialog("Bar Graph Result", width="large")
 def show_bar_graph(df, x_axis, y_axis, selected_file_name, selected_sheet_name = ""):
@@ -166,6 +170,7 @@ def generate_summarized_insight(text):
         st.rerun()
 
 def display_dataframe(uploaded_file = None, selected_sheet_name = "", selected_file_name = "", is_excel=True):
+    data_handler.df = None
     if is_excel:
         # region Display DataFrame from Excel
         try:
@@ -176,7 +181,7 @@ def display_dataframe(uploaded_file = None, selected_sheet_name = "", selected_f
                 return
             data_handler.df = df
             st.dataframe(data_handler.df)
-            display_segmented_control(data_handler.df, selected_sheet_name=selected_sheet_name, selected_file_name=selected_file_name)
+            display_segmented_control(selected_sheet_name=selected_sheet_name, selected_file_name=selected_file_name)
         except Exception as e:
             st.error(f"Failed to read the Excel file or sheet: {e}")
         # endregion
@@ -195,7 +200,7 @@ def display_dataframe(uploaded_file = None, selected_sheet_name = "", selected_f
                 return
             data_handler.df = df
             st.dataframe(data_handler.df)
-            display_segmented_control(data_handler.df, selected_sheet_name=selected_sheet_name, selected_file_name=selected_file_name)
+            display_segmented_control(selected_sheet_name=selected_sheet_name, selected_file_name=selected_file_name)
         except pd.errors.EmptyDataError:
             st.error("The uploaded CSV file is empty or invalid.")
         # endregion
@@ -209,14 +214,14 @@ def display_insight(df):
             key="insight_input", 
             placeholder="Write your insight here... (Leading / Trailing whitespaces will be trimmed at the input generation)", 
             label_visibility="collapsed",
-            disabled=st.session_state.get("is_loading_data")
+            disabled=is_loading_data
         )
 
         reformatted_insight_input = insight_input.strip()
 
         if st.button(
             "Generate Insight", 
-            disabled=st.session_state.get("is_loading_data"), 
+            disabled=is_loading_data, 
             use_container_width=True):
             if reformatted_insight_input:
                 st.session_state.is_loading_data = True
@@ -236,7 +241,7 @@ def display_insight(df):
 
         # region Show Error from Generating Insight
         if st.session_state.get("insight_error_message"):
-            st.error(st.session_state.insight_error_message)
+            st.error(st.session_state.get("insight_error_message"))
         # endregion
 
         # region Show Generated Insight
@@ -246,22 +251,20 @@ def display_insight(df):
                 st.markdown("#### Generated Insight")
                 st.markdown(f"Insight generation powered by ```{OPEN_AI_MODEL}``` via OpenAI 🤖")
                 st.markdown('<hr style="border: 1px solid #bbb; margin-top: 8px; margin-bottom: 8px;">', unsafe_allow_html=True)
-                st.markdown(st.session_state.generated_insight)
-                st.download_button(
+                st.markdown(st.session_state.get("generated_insight"))
+                generate_download_text_button(
                     label="Download Insight",
-                    data=st.session_state.generated_insight,
+                    data=st.session_state.get("generated_insight"),
                     file_name="generated_insight.txt",
-                    mime="text/plain",
-                    use_container_width=True,
-                    key="generated_download_insight_btn",
-                    disabled=st.session_state.get("is_loading_data")
+                    disabled=is_loading_data,
+                    key="generated_download_insight_btn"
                 )
 
                 if st.button(
                     "Summarize Insight", 
                     use_container_width=True, 
                     key="generated_summarized_insight_btn",
-                    disabled=st.session_state.get("is_loading_data")
+                    disabled=is_loading_data
                 ):
                     st.session_state.is_loading_data = True
                     st.session_state.summary_generating = True
@@ -270,7 +273,7 @@ def display_insight(df):
                     st.rerun()
                     
                 if st.session_state.get("summary_generating"):
-                    generate_summarized_insight(st.session_state.generated_insight)
+                    generate_summarized_insight(st.session_state.get("generated_insight"))
 
                 # region Show Summarized insight
                 if st.session_state.get("summarized_insight") and not st.session_state.get("summary_generating"):
@@ -279,19 +282,17 @@ def display_insight(df):
                         st.markdown("#### Summarized Insight")
                         st.markdown(f"Summary generation powered by `{HUGGING_FACE_AI_MODEL}` via HuggingFace Inference API 🤖")
                         st.markdown('<hr style="border: 1px solid #bbb; margin-top: 8px; margin-bottom: 8px;">', unsafe_allow_html=True)
-                        st.markdown(st.session_state.summarized_insight)
-                        st.download_button(
+                        st.markdown(st.session_state.get("summarized_insight"))
+                        generate_download_text_button(
                             label="Download Summary",
-                            data=st.session_state.summarized_insight,
-                            file_name="summarized_insight.txt",
-                            mime="text/plain",
-                            use_container_width=True
+                            data=st.session_state.get("generated_insight"),
+                            file_name="summarized_insight.txt"
                         )
                 # endregion
 
                 # region Show Error from Summarized insight
                 if st.session_state.get("summarized_insight_error_message"):
-                    st.error(st.session_state.summarized_insight_error_message)
+                    st.error(st.session_state.get("summarized_insight_error_message"))
                 # endregion
         # endregion
 
@@ -309,17 +310,16 @@ def display_bar_chart(df, selected_file_name, selected_sheet_name=""):
             categorical_cols,
             index=None,
             placeholder= "Select x-axis (categorical columns)",
-            key="bar_x_axis"
+            key=f"bar_x_axis_{selected_file_name}" if not selected_sheet_name else f"bar_x_axis_{selected_file_name}_{selected_sheet_name}"
         )
         y_axis = st.selectbox(
             "Average Y-axis", 
             numeric_cols,
             index=None,
             placeholder="Select average y-axis value (numeric columns)",  
-            key="bar_y_axis"
+            key=f"bar_y_axis_{selected_file_name}" if not selected_sheet_name else f"bar_y_axis_{selected_file_name}_{selected_sheet_name}"
         )
-
-        if st.button("Display", key="display_bar_chart", use_container_width=True):
+        if st.button("Display", key=f"display_bar_chart_{selected_file_name}" if not selected_sheet_name else f"display_bar_chart_{selected_file_name}_{selected_sheet_name}", use_container_width=True):
             if x_axis is None:
                 st.error("X-axis must not be empty.")
             elif y_axis is None:
@@ -339,9 +339,9 @@ def display_pie_chart(df, selected_file_name, selected_sheet_name=""):
             pie_cols,
             index=None,
             placeholder="Select a column for pie chart",
-            key="pie_chart_col"
+            key=f"pie_chart_col_{selected_file_name}" if not selected_sheet_name else f"pie_chart_col_{selected_file_name}_{selected_sheet_name}"
         )
-        if st.button("Display", key="display_pie_chart", use_container_width=True):
+        if st.button("Display", key=f"display_pie_chart_{selected_file_name}" if not selected_sheet_name else f"display_pie_chart_{selected_file_name}_{selected_sheet_name}", use_container_width=True):
             if pie_col is None:
                 st.error("Please select a column for the pie chart.")
             else:
@@ -351,13 +351,13 @@ def display_scatter_plot(df, selected_file_name, selected_sheet_name=""):
     numeric_cols = data_handler.get_numeric_columns(df=df)
     if len(numeric_cols) < 2:
         st.warning("At least two numerical columns are required to display a scatter plot. Please re-upload the data with more numeric columns.")
-    else:                    
+    else:       
         x_axis = st.selectbox(
             "X-axis",
             numeric_cols,
             index=None,
             placeholder="Select X-axis (numeric column)",
-            key="scatter_x_axis"
+            key=f"scatter_x_axis_{selected_file_name}" if not selected_sheet_name else f"scatter_x_axis_{selected_file_name}_{selected_sheet_name}"
         )
 
         # Only show Y-axis select box if X-axis is selected
@@ -368,12 +368,12 @@ def display_scatter_plot(df, selected_file_name, selected_sheet_name=""):
                 y_axis_options,
                 index=None,
                 placeholder="Select Y-axis (numeric column)",
-                key="scatter_y_axis"
+                key=f"scatter_y_axis_{selected_file_name}" if not selected_sheet_name else f"scatter_y_axis_{selected_file_name}_{selected_sheet_name}"
             )
         else:
             y_axis = None
 
-        if st.button("Display", key="display_scatter_plot", use_container_width=True):
+        if st.button("Display", key=f"display_scatter_plot_{selected_file_name}" if not selected_sheet_name else f"display_scatter_plot_{selected_file_name}_{selected_sheet_name}", use_container_width=True):
             if x_axis is None:
                 st.error("X-axis must not be empty.")
             elif y_axis is None:
@@ -524,15 +524,15 @@ def display_summary_by_columns(df):
         )
 
         # Reset summarized state if columns change
-        if st.session_state.last_selected_columns != selected_columns:
+        if st.session_state.get("latest_selected_columns") != selected_columns:
             st.session_state.display_summarized_columns = False
-        st.session_state.last_selected_columns = selected_columns
+        st.session_state.latest_selected_columns = selected_columns
 
         if st.button("Summarize", key="summarize", use_container_width=True):
             st.session_state.display_summarized_columns = True
         
         # region Show Expanders if displayed summarized columns
-        if st.session_state.display_summarized_columns and selected_columns:
+        if st.session_state.get("display_summarized_columns") and selected_columns:
             for col in selected_columns:
                 with st.expander(f"Column {col}", expanded=True):
                     # region General Summary
@@ -675,30 +675,27 @@ def display_summary_by_columns(df):
 
                         # endregion
                     # endregion
-        elif st.session_state.display_summarized_columns and not selected_columns:
+        elif st.session_state.get("display_summarized_columns") and not selected_columns:
             st.error("Please select at least 1 column to summarize.")
     # endregion
 
-def display_segmented_control(df, selected_sheet_name = "", selected_file_name = ""):
+def display_segmented_control(selected_sheet_name = "", selected_file_name = ""):
     # Remove unnamed columns
-    df_without_unnamed_columns = data_handler.remove_unnamed_columns(df=df)
-
-    options = ["Summary", "Insight", "Chart"]
-
+    df_without_unnamed_columns = get_cleaned_df(data_handler.df)
     selected_section = st.segmented_control(
         "Select View",
         options=["Summary", "Insight", "Chart"],
         key="main_segmented_control",
-        disabled=st.session_state.get("is_loading_data"),
+        disabled=is_loading_data,
     )
 
     # Only clear when switching to Insight
-    if selected_section == "Insight" and st.session_state.last_selected_section != "Insight":
+    if selected_section == "Insight" and st.session_state.get("latest_selected_section") != "Insight":
         st.session_state.generated_insight = None
         st.session_state.summarized_insight = None
         st.session_state.insight_error_message = None
 
-    st.session_state.last_selected_section = selected_section
+    st.session_state.latest_selected_section = selected_section
 
     if selected_section == "Summary":
         overall_summary, summary_by_columns = st.tabs(["Overall", "Summary by Column(s)"])
@@ -719,6 +716,17 @@ def generate_download_png_button(buffer, file_name = ""):
         file_name=file_name,
         mime="image/png",
         use_container_width=True
+    )
+
+def generate_download_text_button(label, data, file_name, disabled=False, key=None):
+    st.download_button(
+        label=label,
+        data=data,
+        file_name=file_name,
+        mime="text/plain",
+        use_container_width=True,
+        disabled=disabled,
+        key=key
     )
 
 def generate_insight_from_openai(insight_input, df):
@@ -773,21 +781,23 @@ def generate_insight_from_openai(insight_input, df):
 # region UI
 st.title('📊 AI Data Visualizer')
 
+is_loading_data = st.session_state.get("is_loading_data")
+
 uploaded_file = st.file_uploader(
     "Upload your file here", 
     type=ALLOWED_FILE_TYPES, 
     key="file_uploader",
     on_change=reset_uploaded_file,
-    disabled=st.session_state.get("is_loading_data")
+    disabled=is_loading_data
 )
 
-if st.button("Upload File", use_container_width=True, disabled=st.session_state.get("is_loading_data")):
+if st.button("Upload File", use_container_width=True, disabled=is_loading_data):
     valid_uploaded_file = is_valid_uploaded_file(uploaded_file)
 
     if valid_uploaded_file:
         st.session_state.uploaded_file = uploaded_file
 
-if st.session_state.uploaded_file is not None:
+if st.session_state.get("uploaded_file") is not None:
     uploaded_file = st.session_state.uploaded_file
     file_type = uploaded_file.type
     file_name = uploaded_file.name
@@ -812,11 +822,11 @@ if st.session_state.uploaded_file is not None:
                         index=None,
                         placeholder="Select a sheet to visualize",
                         key="sheet_selector",
-                        disabled=st.session_state.get("is_loading_data")
+                        disabled=is_loading_data
                     )
 
                     # region Set Selected Segmented control to "Summary" when changing sheet
-                    if st.session_state.latest_selected_sheet != selected_sheet:
+                    if st.session_state.get("latest_selected_sheet") != selected_sheet:
                         st.session_state.main_segmented_control = "Summary"
                         st.session_state.latest_selected_sheet = selected_sheet
                     # endregion
