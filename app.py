@@ -69,6 +69,7 @@ def reset_uploaded_file():
     st.session_state.is_loading_data = False
     st.session_state.summarized_insight = None
     st.session_state.summarized_insight_error_message = None
+    st.session_state.main_segmented_control = None
 
 def format_column_value(value):
     if isinstance(value, float):
@@ -836,11 +837,16 @@ if st.session_state.get("uploaded_file") is not None:
                 else:
                     # region Handle Single sheet upload
                     selected_sheet = sheet_names[0]
+                    if st.session_state.get("main_segmented_control") is None:
+                        st.session_state.main_segmented_control = "Summary"
+                    st.session_state.latest_selected_sheet = selected_sheet
                     display_dataframe(selected_sheet_name=selected_sheet, selected_file_name=file_name)
                     # endregion
         except Exception as e:
             st.error(f"Failed to read the Excel file: {e}")
     elif file_type == "text/csv":
+        if st.session_state.get("main_segmented_control") is None:
+            st.session_state.main_segmented_control = "Summary"
         display_dataframe(
             uploaded_file=uploaded_file,
             selected_file_name=file_name,
