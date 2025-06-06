@@ -524,10 +524,11 @@ def display_summary_by_columns(df):
             key="selected_columns"
         )
 
-        # Reset summarized state if columns change
+        # region Reset summarized state if columns change
         if st.session_state.get("latest_selected_columns") != selected_columns:
             st.session_state.display_summarized_columns = False
         st.session_state.latest_selected_columns = selected_columns
+        # endregion
 
         if st.button("Summarize", key="summarize", use_container_width=True):
             st.session_state.display_summarized_columns = True
@@ -827,7 +828,9 @@ if st.session_state.get("uploaded_file") is not None:
 
                     # region Set Selected Segmented control to "Summary" when changing sheet
                     if st.session_state.get("latest_selected_sheet") != selected_sheet:
-                        st.session_state.main_segmented_control = "Summary"
+                        # Only reset segmented control if the sheet actually changes
+                        if st.session_state.get("main_segmented_control") != "Summary":
+                            st.session_state.main_segmented_control = "Summary"
                         st.session_state.latest_selected_sheet = selected_sheet
                     # endregion
 
