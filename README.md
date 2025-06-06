@@ -6,6 +6,33 @@ AI Data Visualizer
 
 ### Table of Contents
 
+- [ai\_data\_visualizer](#ai_data_visualizer)
+    - [Project Title](#project-title)
+    - [Table of Contents](#table-of-contents)
+    - [Purpose and Background](#purpose-and-background)
+      - [Purpose](#purpose)
+      - [Background](#background)
+    - [Features](#features)
+    - [How to run project locally](#how-to-run-project-locally)
+    - [How to create OpenAI API Key](#how-to-create-openai-api-key)
+    - [How to create HuggingFace Inference API Key](#how-to-create-huggingface-inference-api-key)
+    - [Demo](#demo)
+      - [Upload File](#upload-file)
+        - [Upload CSV](#upload-csv)
+        - [Upload XLS](#upload-xls)
+        - [Upload XLSX](#upload-xlsx)
+      - [Summary](#summary)
+        - [Select Overall Summary](#select-overall-summary)
+        - [Select Summary by Column(s)](#select-summary-by-columns)
+      - [Insight](#insight)
+        - [Generate Insight](#generate-insight)
+        - [Generate Summary from Insight](#generate-summary-from-insight)
+      - [Chart](#chart)
+        - [Bar Chart](#bar-chart)
+        - [Pie Chart](#pie-chart)
+        - [Scatter Plot](#scatter-plot)
+    - [Link Application Deployment](#link-application-deployment)
+
 ### Purpose and Background
 
 #### Purpose
